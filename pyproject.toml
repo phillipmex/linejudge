@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "linejudge"
+version = "0.1.0"
+description = "The independent line judge for coding agents - runs your agent, then verifies its work itself. Never trust the player's call."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "phillipmex" }]
+keywords = ["ai-agents", "verification", "claude-code", "autonomous", "harness"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Quality Assurance",
+]
+# Zero runtime dependencies -- stdlib only, by design.
+dependencies = []
+
+[project.scripts]
+linejudge = "linejudge.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/phillipmex/linejudge"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"linejudge.dashboard" = ["index.html"]

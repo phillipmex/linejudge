@@ -1,0 +1,23 @@
+[
+  {
+    "number": 101,
+    "title": "Config loader crashes on empty YAML file",
+    "url": "https://github.com/example/widget/issues/101",
+    "labels": [{"name": "bug"}, {"name": "config"}],
+    "body": "Loading an empty config.yml raises TypeError instead of falling back to defaults.\n\nSteps:\n1. `touch config.yml`\n2. `widget start`\n\n---\n\nExpected: defaults applied. Actual: crash."
+  },
+  {
+    "number": 102,
+    "title": "Add --json flag to `widget status`",
+    "url": "https://github.com/example/widget/issues/102",
+    "labels": [{"name": "enhancement"}, {"name": "cli"}],
+    "body": "Machine-readable status output for scripting. Should mirror the human output field-for-field."
+  },
+  {
+    "number": 103,
+    "title": "Docs: quickstart still references v1 API",
+    "url": "https://github.com/example/widget/issues/103",
+    "labels": [{"name": "documentation"}],
+    "body": "docs/quickstart.md shows `widget.connect()` which was removed in v2."
+  }
+]
