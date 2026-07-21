@@ -52,6 +52,22 @@ linejudge run proofs/goals-NAME/<goal>.md      # one run per goal
 python proofs/stats.py --root . > PROOF.md
 ```
 
+## Rehearse before you spend
+
+With neither `ANTHROPIC_API_KEY` nor `CLAUDE_CONFIG_DIR` set, `claude -p` bills
+whatever account is logged in — a Pro/Max subscription, if you have one. Running
+one or two goals that way costs nothing and exercises the whole chain against a
+real agent: worktree creation, diff capture, verifier execution, ledger write.
+
+The catch is the ledger. `total_cost_usd` in the JSON envelope is what the tokens
+*would* have cost at API rates; on a subscription no such money is spent, so those
+figures are notional and must not be published as costs. Move `runs/ledger.jsonl`
+aside after a rehearsal so the paid run starts from an empty ledger.
+
+Note that `.env.local` is overlaid onto the agent subprocess's environment. Keep
+release credentials and anything else the agent has no business reading somewhere
+else.
+
 `demo.py` performs this whole loop against `fixtures/issues.json` with the
 MockAdapter, including an agent that lies about success — useful for checking
 the pipeline end to end without an API key.

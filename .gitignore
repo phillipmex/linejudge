@@ -3,8 +3,10 @@ runs/*/workspace/
 runs/*/write_worktree/
 runs/*/session.json
 
-# Local config / credentials
+# Local config / credentials. .env.local is overlaid into the agent subprocess
+# environment, so release credentials live in .env.pypi instead — never there.
 .env.local
+.env.pypi
 
 # Proof-run working material (cloned target repos, venvs, generated goals);
 # regenerate with the documented command in proofs/README.md
