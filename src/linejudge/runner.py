@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from linejudge import guard, learn, ledger, prompts, verify, worktree
+from linejudge import guard, learn, ledger, prompts, redact, verify, worktree
 from linejudge.goal import load_goal
 
 READ_TOOLS = "Read,Glob,Grep,Write"
@@ -122,7 +122,10 @@ def run_goal(goal_path, root, adapter, dry_run=False, retry_delay=RETRY_DELAY_SE
         write_note = (
             f"- write branch: `{worktree.BRANCH_PREFIX}{run_id}` ({branch_state})\n"
             f"- write diff: write_diff.patch — review before merging into {goal.write_repo}\n"
-            f"- cleanup when done: `linejudge cleanup {run_dir}` (never remove by hand)\n"
+            # root-relative: the printed command stays copy-pasteable after the
+            # trail is redacted (an absolute path would become a placeholder)
+            f"- cleanup when done: `linejudge cleanup {run_dir.relative_to(root)}`"
+            f" (never remove by hand)\n"
         )
     (run_dir / "summary.md").write_text(
         f"# {run_id}\n\n"
@@ -140,4 +143,7 @@ def run_goal(goal_path, root, adapter, dry_run=False, retry_delay=RETRY_DELAY_SE
         json.dumps({"run_id": run_id, "status": status, "failures": failures}, indent=2),
         encoding="utf-8", newline="\n",
     )
+    # last, so it covers every artifact the run produced — including the ones
+    # verify.py and guard.py wrote mid-run
+    redact.run_dir(run_dir, root)
     return RunOutcome(run_id, status, failures, run_dir)

@@ -2,6 +2,9 @@
 runs/*/workspace/
 runs/*/write_worktree/
 runs/*/session.json
+# machine-local teardown state: real absolute paths `linejudge cleanup` reads
+# back, so it is excluded from redaction and must stay out of the trail
+runs/*/cleanup.json
 
 # Local config / credentials. .env.local is overlaid into the agent subprocess
 # environment, so release credentials live in .env.pypi instead — never there.

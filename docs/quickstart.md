@@ -93,6 +93,12 @@ runs/<run_id>/
 └── summary.md         # human-readable recap
 ```
 
+Run directories are meant to be committed, so the harness rewrites absolute
+local paths in them as `<harness-root>` and `<home>` before the run returns —
+publishing a trail does not publish your filesystem layout. `session.json`
+(raw evidence) and `cleanup.json` (real paths, read back by `linejudge
+cleanup`) are exempt, and both are gitignored.
+
 ## 5. Write-mode goals
 
 To let the agent modify a real repo, add `write_repo:` to the goal header:

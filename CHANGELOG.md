@@ -4,6 +4,16 @@ All notable changes to linejudge are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Path redaction in the run trail** — absolute paths from the machine that
+  produced a run (harness root, home directory) are replaced with
+  `<harness-root>` / `<home>` across every committed artifact, so a published
+  trail does not leak local filesystem layout. `cleanup.json` keeps real paths
+  (teardown reads them back) and is now gitignored instead.
+
 ## [0.1.0] — 2026-07-21
 
 First release. The independent line judge for coding agents: runs your agent
