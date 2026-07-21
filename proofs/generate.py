@@ -40,7 +40,8 @@ def fetch_issues(repo, limit):
     return json.loads(out.stdout)
 
 
-def goal_text(issue, repo, verifiers=(), extra_tags=()):
+def goal_text(issue, repo, verifiers=(), extra_tags=(), write_repo=None,
+              timeout_secs=None, notes=()):
     number = issue["number"]
     name = f"issue-{number}-{slugify(issue.get('title', ''))}"
     tags = ["proof", _clean_tag(repo)] if repo else ["proof"]
@@ -52,6 +53,13 @@ def goal_text(issue, repo, verifiers=(), extra_tags=()):
     if verifiers:
         lines.append("verifiers:")
         lines += [f"  - {v}" for v in verifiers]
+    if notes:
+        lines.append("agent_notes:")
+        lines += [f"  - {_clean_tag(n)}" for n in notes]
+    if write_repo:
+        lines.append(f"write_repo: {write_repo}")
+    if timeout_secs:
+        lines.append(f"timeout_secs: {timeout_secs}")
     lines.append("---")
     body = (issue.get("body") or "").strip()
     lines += [
@@ -65,12 +73,14 @@ def goal_text(issue, repo, verifiers=(), extra_tags=()):
     return name, "\n".join(lines) + "\n"
 
 
-def write_goals(issues, out_dir, repo, verifiers=(), extra_tags=()):
+def write_goals(issues, out_dir, repo, verifiers=(), extra_tags=(),
+                write_repo=None, timeout_secs=None, notes=()):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     for issue in issues:
-        name, text = goal_text(issue, repo, verifiers, extra_tags)
+        name, text = goal_text(issue, repo, verifiers, extra_tags,
+                               write_repo, timeout_secs, notes)
         path = out_dir / f"{name}.md"
         path.write_text(text, encoding="utf-8", newline="\n")
         paths.append(path)
@@ -86,6 +96,10 @@ def main(argv=None):
     parser.add_argument("--verifier", action="append", default=[],
                         help='repeatable "kind: spec", e.g. "command: python -m pytest -q"')
     parser.add_argument("--tag", action="append", default=[], help="extra tag (repeatable)")
+    parser.add_argument("--write-repo", help="local clone the agent gets a write cycle on")
+    parser.add_argument("--timeout", type=int, help="per-goal timeout_secs")
+    parser.add_argument("--note", action="append", default=[],
+                        help="agent_notes line (repeatable)")
     args = parser.parse_args(argv)
 
     if args.from_json:
@@ -96,7 +110,8 @@ def main(argv=None):
         parser.error("need --repo or --from-json")
 
     paths = write_goals(issues[:args.limit], args.out, args.repo or "",
-                        args.verifier, args.tag)
+                        args.verifier, args.tag, args.write_repo, args.timeout,
+                        args.note)
     for p in paths:
         print(p)
     print(f"{len(paths)} goal files in {args.out}")

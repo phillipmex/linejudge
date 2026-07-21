@@ -59,6 +59,14 @@ class GenerateTests(TmpDirTestCase):
         self.assertIn("bad- label", goal.tags)
         self.assertIn("ok", goal.tags)
 
+    def test_write_repo_and_timeout_reach_the_goal(self):
+        issue = {"number": 9, "title": "writes", "labels": [], "body": "x"}
+        goal = load_goal(generate.write_goals(
+            [issue], self.tmp, "o/r", write_repo=str(self.tmp / "clone"),
+            timeout_secs=900)[0])
+        self.assertEqual(goal.write_repo, Path(self.tmp / "clone"))
+        self.assertEqual(goal.timeout_secs, 900)
+
     def test_empty_body_placeholder(self):
         issue = {"number": 8, "title": "empty", "labels": [], "body": None}
         goal = load_goal(generate.write_goals([issue], self.tmp, "o/r")[0])

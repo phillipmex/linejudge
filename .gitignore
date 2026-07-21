@@ -6,6 +6,11 @@ runs/*/session.json
 # Local config / credentials
 .env.local
 
+# Proof-run working material (cloned target repos, venvs, generated goals);
+# regenerate with the documented command in proofs/README.md
+proofs/targets/
+proofs/goals-*/
+
 # Python
 __pycache__/
 *.pyc
