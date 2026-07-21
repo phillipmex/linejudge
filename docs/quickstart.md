@@ -13,10 +13,16 @@ nothing and need no API key; step 4 runs a real agent.
 ## 1. Install
 
 ```console
+pip install linejudge
+linejudge --version
+```
+
+The example goals and mock demo used in steps 2–3 ship in the repo, not the
+package, so grab it too (or install from source with `pip install .`):
+
+```console
 git clone https://github.com/phillipmex/linejudge
 cd linejudge
-pip install .
-linejudge --version
 ```
 
 Zero runtime dependencies — the install is the package itself and a `linejudge`

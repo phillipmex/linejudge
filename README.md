@@ -74,8 +74,10 @@ goal.md ─────► runner ─────► adapter ──────�
 Needs Python 3.10+. Nothing else — no API key required for the mock pipeline.
 
 ```console
+pip install linejudge
+
+# example goals + the mock demo live in the repo
 git clone https://github.com/phillipmex/linejudge && cd linejudge
-pip install .
 
 # 1. See exactly what the harness would send — zero spend
 linejudge run goals/examples/hello.md --dry-run
