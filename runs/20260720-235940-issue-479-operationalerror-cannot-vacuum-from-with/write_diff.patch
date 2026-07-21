@@ -1,0 +1,81 @@
+diff --git a/docs/python-api.rst b/docs/python-api.rst
+index 43b734d..e233b31 100644
+--- a/docs/python-api.rst
++++ b/docs/python-api.rst
+@@ -437,6 +437,7 @@ Prefer ``db.atomic()`` or ``db.begin()``, ``db.commit()`` and ``db.rollback()``
+ Some related safeguards to be aware of:
+ 
+ - ``db.enable_wal()`` and ``db.disable_wal()`` raise a ``sqlite_utils.db.TransactionError`` if called while a transaction is open, because changing the journal mode would commit it as a side effect.
++- ``db.vacuum()`` raises a ``sqlite_utils.db.TransactionError`` if called while a transaction is open, because SQLite cannot run ``VACUUM`` from within a transaction - see :ref:`python_api_vacuum`.
+ - ``table.transform()`` raises a ``sqlite_utils.db.TransactionError`` if called while a transaction is open with ``PRAGMA foreign_keys`` enabled and the table is referenced by foreign keys with destructive ``ON DELETE`` actions, because the pragma cannot be turned off mid-transaction to protect those referencing rows - see :ref:`python_api_transform_foreign_keys_transactions`.
+ - Closing the database - explicitly with ``db.close()``, or by exiting a ``with Database(...) as db:`` block - rolls back any transaction that is still open, see :ref:`python_api_close`.
+ 
+@@ -3104,6 +3105,8 @@ You can optimize your database by running VACUUM against it like so:
+ 
+     Database("my_database.db").vacuum()
+ 
++SQLite cannot run ``VACUUM`` inside a transaction, so ``db.vacuum()`` raises a ``sqlite_utils.db.TransactionError`` if a transaction is open - commit or roll it back first. See :ref:`python_api_transactions`.
++
+ .. note::
+     In the CLI: :ref:`sqlite-utils vacuum <cli_vacuum>`
+ 
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..89a49ac 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -1896,7 +1896,18 @@ class Database:
+                     existing_indexes.add(fk.columns)
+ 
+     def vacuum(self) -> None:
+-        "Run a SQLite ``VACUUM`` against the database."
++        """
++        Run a SQLite ``VACUUM`` against the database.
++
++        :raises TransactionError: if called while a transaction is open - SQLite
++          cannot run ``VACUUM`` inside a transaction, and the library will not
++          commit a transaction on your behalf
++        """
++        if self.conn.in_transaction:
++            raise TransactionError(
++                "vacuum() cannot be used while a transaction is open - SQLite "
++                "cannot VACUUM from within a transaction, commit or roll back first"
++            )
+         self.execute("VACUUM;")
+ 
+     def analyze(self, name: Optional[str] = None) -> None:
+diff --git a/tests/test_create.py b/tests/test_create.py
+index d281eb4..7ea7702 100644
+--- a/tests/test_create.py
++++ b/tests/test_create.py
+@@ -11,6 +11,7 @@ from sqlite_utils.db import (
+     View,
+     NoTable,
+     NoView,
++    TransactionError,
+ )
+ from sqlite_utils.utils import hash_record, sqlite3
+ import collections
+@@ -1170,6 +1171,23 @@ def test_vacuum(fresh_db):
+     fresh_db.vacuum()
+ 
+ 
++@pytest.mark.parametrize("begin", (True, False))
++def test_vacuum_inside_transaction_raises(fresh_db, begin):
++    fresh_db["data"].insert({"foo": "foo", "bar": "bar"})
++    if begin:
++        fresh_db.begin()
++        with pytest.raises(TransactionError) as ex:
++            fresh_db.vacuum()
++        fresh_db.rollback()
++    else:
++        with fresh_db.atomic():
++            with pytest.raises(TransactionError) as ex:
++                fresh_db.vacuum()
++    assert "cannot VACUUM from within a transaction" in str(ex.value)
++    # The transaction was left intact, and vacuum() works once it is over
++    fresh_db.vacuum()
++
++
+ def test_works_with_pathlib_path(tmpdir):
+     path = pathlib.Path(tmpdir / "test.db")
+     db = Database(path)

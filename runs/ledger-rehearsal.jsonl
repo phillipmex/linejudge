@@ -1,0 +1,2 @@
+{"run_id": "20260720-235940-issue-479-operationalerror-cannot-vacuum-from-with", "goal": "issue-479-operationalerror-cannot-vacuum-from-with", "tags": ["proof", "sqlite-utils"], "status": "SUCCESS", "total_cost_usd": 1.987237, "num_calls": 2}
+{"run_id": "20260721-000429-issue-588-table-get-column-value-option-for-retrie", "goal": "issue-588-table-get-column-value-option-for-retrie", "tags": ["proof", "sqlite-utils"], "status": "SUCCESS", "total_cost_usd": 1.844507, "num_calls": 2}

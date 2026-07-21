@@ -1,0 +1,5 @@
+{
+  "write_repo": "<harness-root>\\proofs\\targets\\sqlite-utils",
+  "write_worktree": "<harness-root>\\runs\\20260720-235940-issue-479-operationalerror-cannot-vacuum-from-with\\write_worktree",
+  "write_link_dirs": []
+}
