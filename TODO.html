@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>linejudge &mdash; Project Tracker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 32px auto; padding: 0 20px; max-width: 1200px; background: #1a1a1a; color: #e8e8e8; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    .subtitle { color: #888; font-size: 0.88rem; margin-bottom: 24px; }
+    .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .plan { background: #252525; border: 1px solid #3a3a3a; border-radius: 10px; padding: 20px; }
+    h2 { font-size: 1rem; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid #3a3a3a; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border-radius: 6px; margin-bottom: 4px; border: 1px solid #333; background: #2a2a2a; }
+    li.done { background: #1a2f1a; border-color: #2a5a2a; color: #aaa; }
+    li.done .label { text-decoration: line-through; }
+    li.blocked { background: #2f2010; border-color: #6a4a10; }
+    li.next { background: #101830; border-color: #2040a0; }
+    .icon { flex-shrink: 0; margin-top: 2px; }
+    .label { flex: 1; font-size: 0.88rem; line-height: 1.4; }
+    .tag { font-size: 0.72rem; background: #3a3a3a; border-radius: 4px; padding: 1px 6px; color: #bbb; white-space: nowrap; align-self: center; }
+    li.done .tag { background: #1a4a1a; color: #5aaa5a; }
+    li.blocked .tag { background: #4a3000; color: #ddaa40; }
+    li.next .tag { background: #101840; color: #6090e0; }
+    .cmd { font-family: monospace; font-size: 0.78rem; color: #ccc; background: #333; border-radius: 3px; padding: 1px 4px; word-break: break-all; }
+    .open-q { margin-top: 24px; background: #252525; border: 1px solid #3a3a3a; border-radius: 10px; padding: 20px; }
+    .divider { border: none; border-top: 1px dashed #444; margin: 8px 0; }
+    .updated { color: #555; font-size: 0.75rem; margin-top: 24px; text-align: right; }
+    .ps-link { display: inline-block; font-size: 0.78rem; color: #7ac8a0; text-decoration: none; border: 1px solid #2a6040; border-radius: 5px; padding: 4px 10px; margin-bottom: 20px; }
+    .ps-link:hover { background: #0e2018; }
+  </style>
+</head>
+<body>
+
+<h1>linejudge &mdash; Project Tracker</h1>
+<p class="subtitle">Open-core independent verification harness for coding agents: the agent&rsquo;s REPORT.md is a claim, the verifiers run outside its session and produce the verdict. Public at <span class="cmd">github.com/phillipmex/linejudge</span>, PyPI <span class="cmd">linejudge</span> 0.1.0.</p>
+<a class="ps-link" href="openps:C:\Users\Admin\repos\linejudge">&#9656; Open terminal here</a>
+
+<div class="plans">
+
+  <div class="plan">
+    <h2>Shipped</h2>
+    <ul>
+      <li class="done"><span class="icon">&#10003;</span><span class="label"><strong>Path redaction is part of the harness</strong> (<span class="cmd">e7b31d0</span>) &mdash; <span class="cmd">src/linejudge/redact.py</span> rewrites the harness root and home dir as <span class="cmd">&lt;harness-root&gt;</span> / <span class="cmd">&lt;home&gt;</span> across every committed artifact, handling the raw, JSON-escaped and forward-slash forms. Called last in <span class="cmd">run_goal</span> so it also catches what <span class="cmd">verify.py</span> and <span class="cmd">guard.py</span> wrote mid-run. Exempt and gitignored: <span class="cmd">session.json</span> (raw evidence), <span class="cmd">cleanup.json</span> (teardown reads the real paths back), <span class="cmd">write_diff.patch</span> (must apply verbatim). 101 tests pass.</span><span class="tag">done</span></li>
+      <li class="done"><span class="icon">&#10003;</span><span class="label"><strong>v0.1.0 released</strong> &mdash; tagged, published to PyPI, repo made public, CI green on Windows + Ubuntu &times; Python 3.10/3.12.</span><span class="tag">done</span></li>
+      <li class="done"><span class="icon">&#10003;</span><span class="label"><strong>Free rehearsal passed 2/2</strong> &mdash; two sqlite-utils goals run against the Pro/Max login (no <span class="cmd">ANTHROPIC_API_KEY</span>, no <span class="cmd">CLAUDE_CONFIG_DIR</span>) at $0. Both SUCCESS with independent verdicts passing; suite counts 1373 and 1377 against a 1371 baseline prove the agents really added regression tests. Ledger moved aside to <span class="cmd">runs/ledger-rehearsal.jsonl</span> so its notional API-rate costs cannot leak into PROOF.md.</span><span class="tag">done</span></li>
+      <li class="done"><span class="icon">&#10003;</span><span class="label"><strong>Credential exposure closed</strong> &mdash; the PyPI release token lived in <span class="cmd">.env.local</span>, which <span class="cmd">load_env</span> overlays onto every agent subprocess&rsquo;s environment; every proof run would have handed the agent <span class="cmd">TWINE_PASSWORD</span>. Moved to gitignored <span class="cmd">.env.pypi</span>.</span><span class="tag">security</span></li>
+      <li class="done"><span class="icon">&#10003;</span><span class="label"><strong>Committed run trail scrubbed + history rewritten</strong> (<span class="cmd">2ffcf5b</span>, force-push with <span class="cmd">--force-with-lease</span>) &mdash; <span class="cmd">git log -S'C:\Users' --all</span> is now empty. Caveat: GitHub keeps unreachable blobs fetchable by direct SHA; full expunging would need a support request.</span><span class="tag">done</span></li>
+    </ul>
+  </div>
+
+  <div class="plan">
+    <h2>Open</h2>
+    <ul>
+      <li class="next"><span class="icon">&#9658;</span><span class="label"><strong>NEXT &mdash; the paid proof run.</strong> Put <span class="cmd">ANTHROPIC_API_KEY</span> in <span class="cmd">.env.local</span>, run the 6 remaining goals in <span class="cmd">proofs/goals-sqlite-utils/</span> (#439, #478, #488, #586, #602, #762), then <span class="cmd">python proofs/stats.py --root . &gt; PROOF.md</span>. No manual scrub needed any more. Est. <strong>$12, ceiling $20</strong> &mdash; from measured rehearsal data ($1.99/43 turns, $1.84/44 turns; cost is dominated by ~1.9M cache-read tokens per task, distill ~$0.15). Four of the six are <span class="cmd">table.transform()</span> issues, harder than the deliberately tractable rehearsal pair, and a task that spins to the 900 s timeout still bills.</span><span class="tag">$12</span></li>
+      <li class="blocked"><span class="icon">&#9888;</span><span class="label"><strong>The repo has no real PROOF.md</strong> &mdash; only the mock <span class="cmd">docs/PROOF-sample.md</span>. This is the single biggest credibility gap and it blocks every launch item below; a verification harness with no published verdicts is the thing linejudge exists to catch.</span><span class="tag">blocked</span></li>
+      <li class="blocked"><span class="icon">&#9888;</span><span class="label"><strong>Show HN unposted</strong> &mdash; <span class="cmd">docs/launch/show-hn.md</span> drafted; blocked on HN account age/karma. <span class="cmd">hn-submit.mjs</span> sits in the scratchpad. Do <em>not</em> strip the &ldquo;Show HN:&rdquo; prefix to dodge the new-account restriction.</span><span class="tag">blocked</span></li>
+      <li><span class="icon">&#9675;</span><span class="label"><strong>Blog post</strong> &mdash; <span class="cmd">docs/launch/blog-post.md</span> drafted, no venue chosen.</span><span class="tag">launch</span></li>
+      <li><span class="icon">&#9675;</span><span class="label"><strong>X thread</strong> &mdash; <span class="cmd">docs/launch/x-thread.md</span> drafted, unposted. Possible stray 264-char tweet-4 draft sitting in X Drafts.</span><span class="tag">launch</span></li>
+      <li><span class="icon">&#9675;</span><span class="label"><strong>LLM-judge verifier</strong> for v0.2.0 &mdash; unstarted. A fifth registry kind alongside <span class="cmd">command</span> / <span class="cmd">files_exist</span> / <span class="cmd">diff_constraints</span> / <span class="cmd">http_check</span>.</span><span class="tag">v0.2.0</span></li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="open-q">
+  <h2>Open Questions / Notes</h2>
+  <ul>
+    <li><span class="icon">?</span><span class="label"><span class="cmd">python -m linejudge</span> does <strong>not</strong> work &mdash; the package has no <span class="cmd">__main__.py</span>. Use the <span class="cmd">linejudge</span> console script.</span><span class="tag">gotcha</span></li>
+    <li><span class="icon">?</span><span class="label">Bare <span class="cmd">pytest</span> at the repo root collects the cloned target repo and the live worktrees and errors out. Run <span class="cmd">python -m pytest tests</span> (CI uses <span class="cmd">python -m unittest discover -s tests</span>).</span><span class="tag">gotcha</span></li>
+    <li><span class="icon">?</span><span class="label">On a Pro/Max subscription the JSON envelope still reports <span class="cmd">total_cost_usd</span> at API rates. Those figures are <strong>notional</strong> and must never be published as costs.</span><span class="tag">note</span></li>
+    <li><span class="icon">?</span><span class="label">300 lines per file is the repo standard. <span class="cmd">worktree.py</span> is the closest at 200; PLAN.md says split before breaching, never waive silently.</span><span class="tag">note</span></li>
+    <li><span class="icon">?</span><span class="label">Two rehearsal worktrees are still checked out (<span class="cmd">runs/20260720-235940-*</span>, <span class="cmd">runs/20260721-000429-*</span>). Tear down with <span class="cmd">linejudge cleanup runs/&lt;id&gt;</span> &mdash; never by hand; the linked dirs are reparse points.</span><span class="tag">note</span></li>
+  </ul>
+</div>
+
+<p class="updated">Last updated: 2026-07-21 (path redaction made part of the harness, <span class="cmd">e7b31d0</span> &mdash; run trails no longer leak local filesystem layout, so the paid proof run needs no manual scrub afterwards; <span class="cmd">cleanup.json</span> untracked and gitignored) &mdash; prev 2026-07-21 (free 2-task rehearsal passed 2/2 on the subscription; <span class="cmd">.env.local</span> &rarr; <span class="cmd">.env.pypi</span> credential fix; committed trail scrubbed and history rewritten, <span class="cmd">2ffcf5b</span>) &mdash; prev 2026-07-21 (v0.1.0 tagged, PyPI publish, repo made public)</p>
+
+</body>
+</html>
