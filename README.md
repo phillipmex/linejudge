@@ -31,8 +31,11 @@ fix the bug:
 
 Neither is reachable by a test suite that doesn't already know about the bug.
 **Machine verification is necessary and it is not sufficient** — so the
-scoreboard reports those levels separately instead of as one number. Full
-evidence trail: [PROOF.md](PROOF.md).
+scoreboard reports those levels separately instead of as one number.
+
+Full evidence trail: [PROOF.md](PROOF.md). The long version, with both rejects
+walked through in detail:
+[Eight patches passed every check I had. Two of them were wrong.](https://phillipmex.github.io/linejudge/)
 
 ## See it in 30 seconds, for free
 

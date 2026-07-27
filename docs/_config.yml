@@ -1,0 +1,9 @@
+title: linejudge
+description: The independent line judge for coding agents. Never trust the player's call.
+theme: jekyll-theme-primer
+url: https://phillipmex.github.io
+baseurl: /linejudge
+
+# Launch drafts are working copy, not published pages.
+exclude:
+  - launch/
