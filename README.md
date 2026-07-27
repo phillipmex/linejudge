@@ -7,6 +7,35 @@ Coding agents routinely claim success. linejudge runs your agent on a goal, then
 codes — and renders its own verdict. The agent's opinion of its own work is
 never consulted.
 
+## What it found
+
+Eight agent-authored patches for eight real [sqlite-utils](https://github.com/simonw/sqlite-utils)
+issues, put through every gate the harness has:
+
+| evidence | result |
+|---|---|
+| Runs succeeded | 7/8 |
+| Independently verified pass — judged by verifiers, not by the claim | **8/8** |
+| Regression test proven — fails with the fix reverted | **8/8** |
+| Diff reviewed against the issue it claims to close | **6/8** |
+
+Three machine gates, 8/8 on every one. Reading the diffs found two that don't
+fix the bug:
+
+- **#439** — the patch counts bytes as `utf-8-sig`. Fixes utf-16, regresses the
+  default: a 708-byte plain-utf-8 CSV reports 1011. The added test covers
+  utf-16-le only.
+- **#762** — the constraint parser masks string literals but not SQL comments,
+  so a commented-out `-- CHECK (id > 0)` is re-emitted as an *active*
+  constraint. A table that accepted `id = -1` starts rejecting it.
+
+Neither is reachable by a test suite that doesn't already know about the bug.
+**Machine verification is necessary and it is not sufficient** — so the
+scoreboard reports those levels separately instead of as one number. Full
+evidence trail: [PROOF.md](PROOF.md).
+
+## See it in 30 seconds, for free
+
 ```
 $ python proofs/demo.py --root demo        # 3 tasks, one agent LIES
 20260721T…-issue-101-config-loader…: SUCCESS
@@ -16,7 +45,7 @@ $ python proofs/demo.py --root demo        # 3 tasks, one agent LIES
 
 The failed run's agent reported `## Status: SUCCESS`. The `files_exist`
 verifier checked the filesystem and disagreed. **The verdict, not the claim,
-decides the run status.** That gap is the whole product — see a full
+decides the run status.** No tokens spent — see the full
 [sample PROOF.md](docs/PROOF-sample.md).
 
 ## Why
