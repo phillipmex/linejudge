@@ -1,0 +1,5 @@
+{
+  "decision": "reject",
+  "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Fixes utf-16 but regresses the default path. cli.py:1212 sets `encoding = encoding or \"utf-8-sig\"`, and the new UpdateWrapper._bytes_length re-encodes every chunk with that codec - utf-8-sig prepends a 3-byte BOM per call, so a plain utf-8 CSV reports 1011 bytes for a 708-byte 100-row file (~43% over). Before the fix len(line) was exact for ASCII. The added test only covers utf-16-le, so nothing catches it. Separately, the issue body's two explicit asks (no stacktrace, silent crash / --debug option) are untouched; the agent fixed the retitled headline instead.",
+  "decided_at": "2026-07-26T21:56:44"
+}

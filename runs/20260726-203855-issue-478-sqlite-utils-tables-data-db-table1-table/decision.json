@@ -1,0 +1,5 @@
+{
+  "decision": "approve",
+  "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Matches the request exactly: optional variadic TABLES argument, filter applied before the --counts loop so large tables really are skipped, backwards compatible, docs and cli-reference both updated. Minor: a name that matches no table is silently ignored rather than erroring.",
+  "decided_at": "2026-07-26T21:56:44"
+}
