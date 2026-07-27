@@ -1,6 +1,6 @@
 {
   "decision": "approve",
-  "reviewer": "assistant",
-  "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Implements the requested .get(column=value) API with the **kwargs shape the issue suggested, plus NotFoundError and a ValueError guard against mixing pk_values with kwargs. Two nits: the docstring the agent added to python-api.rst claims the column must have 'at most one matching row' but the code silently returns the first of many; and `list(rows)[0]` materialises every matching row instead of using LIMIT 1.",
-  "decided_at": "2026-07-26T21:56:44"
+  "reviewer": "human-adopted",
+  "note": "Adopted by the project owner without independent re-derivation; review below is assistant-authored (Opus 5). Implements the requested .get(column=value) API with the **kwargs shape the issue suggested, plus NotFoundError and a ValueError guard against mixing pk_values with kwargs. Two nits: the docstring the agent added to python-api.rst claims the column must have 'at most one matching row' but the code silently returns the first of many; and `list(rows)[0]` materialises every matching row instead of using LIMIT 1.",
+  "decided_at": "2026-07-26T22:25:07"
 }

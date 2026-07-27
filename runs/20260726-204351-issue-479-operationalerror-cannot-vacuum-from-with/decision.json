@@ -1,6 +1,6 @@
 {
   "decision": "approve",
-  "reviewer": "assistant",
-  "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Sound but answers a different question than the reporter asked. They asked whether .vacuum() could auto-commit first; the agent raises TransactionError instead. That is the better call - auto-committing would break the rollback guarantee of atomic() - and it reuses the existing _ensure_no_open_transaction helper (db.py:1188) with the same docstring shape as enable_wal/disable_wal, so it is idiomatic for this codebase. The issue's second ask (docs on how transactions are committed) is unaddressed.",
-  "decided_at": "2026-07-26T21:56:44"
+  "reviewer": "human-adopted",
+  "note": "Adopted by the project owner without independent re-derivation; review below is assistant-authored (Opus 5). Sound but answers a different question than the reporter asked. They asked whether .vacuum() could auto-commit first; the agent raises TransactionError instead. That is the better call - auto-committing would break the rollback guarantee of atomic() - and it reuses the existing _ensure_no_open_transaction helper (db.py:1188) with the same docstring shape as enable_wal/disable_wal, so it is idiomatic for this codebase. The issue's second ask (docs on how transactions are committed) is unaddressed.",
+  "decided_at": "2026-07-26T22:25:07"
 }

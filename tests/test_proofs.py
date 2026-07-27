@@ -129,7 +129,18 @@ class StatsTests(TmpDirTestCase):
                 encoding="utf-8",
             )
         text = stats.render(stats.collect(self.tmp))
-        self.assertIn("1/2 countersigned by a human", text)
+        self.assertIn("1 countersigned by a human", text)
+        self.assertIn("1 assistant-authored and awaiting sign-off", text)
+
+    def test_render_reports_owner_adoption_as_weaker_than_countersigning(self):
+        self._seed_run("r1", "g1", "SUCCESS", 0.04, passed=True, verifiers=1)
+        Path(self.tmp, "runs", "r1", "decision.json").write_text(
+            json.dumps({"decision": "approve", "reviewer": "human-adopted", "note": ""}),
+            encoding="utf-8",
+        )
+        text = stats.render(stats.collect(self.tmp))
+        self.assertIn("not independently re-derived", text)
+        self.assertNotIn("countersigned by a human", text)
 
     def test_empty_root_renders_gracefully(self):
         self.assertIn("No runs recorded", stats.render(stats.collect(self.tmp)))

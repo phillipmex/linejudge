@@ -10,6 +10,7 @@ the harness verdict (verifier pass rate) — that gap is the product.
 import argparse
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -93,13 +94,25 @@ def render(rows, notional_cost=False):
         # An assistant-authored review of an assistant-authored diff is a weaker
         # claim than a human one, and collapsing the two would be the exact
         # overclaim this file exists to avoid.
-        unsigned = [r for r in reviewed if r["reviewer"] != "human"]
+        # Three states, because they are three different strengths of claim:
+        # "human" read the diff themselves, "human-adopted" is the owner accepting
+        # an assistant's review without re-deriving it, and anything else has
+        # nobody's name on it yet.
+        tally = Counter(r["reviewer"] for r in reviewed)
         line = (f"- **Diff reviewed against the issue:** {approved}/{len(reviewed)} "
                 "approved — each diff read next to the issue it claims to fix "
                 "(`runs/<id>/decision.json`)")
-        if unsigned:
-            line += (f"; {len(reviewed) - len(unsigned)}/{len(reviewed)} countersigned "
-                     "by a human, the rest assistant-authored and awaiting sign-off")
+        if tally["human"] < len(reviewed):
+            bits = []
+            if tally["human"]:
+                bits.append(f"{tally['human']} countersigned by a human")
+            if tally["human-adopted"]:
+                bits.append(f"{tally['human-adopted']} assistant-authored and adopted "
+                            "by the project owner, not independently re-derived")
+            rest = len(reviewed) - tally["human"] - tally["human-adopted"]
+            if rest:
+                bits.append(f"{rest} assistant-authored and awaiting sign-off")
+            line += "; " + ", ".join(bits)
         lines.append(line)
 
     # Only claim a model when every run agrees on one; a mixed or unrecorded set

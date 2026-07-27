@@ -113,12 +113,18 @@ approve/reject decision it records in `runs/<id>/decision.json` is the human
 half of the verdict. `stats.py` folds those decisions into PROOF.md, so a diff
 nobody has read shows an em dash rather than quietly counting as clean.
 
-Each decision carries a `reviewer`. The dashboard writes `"human"`, because
-that endpoint is a person clicking; anything written by tooling has to say
-`"assistant"` instead, and PROOF.md then reports how many decisions are still
-awaiting a countersignature. An assistant reviewing an assistant's diff is a
-weaker claim than a human doing it, and the whole point of this file is not to
-collapse two levels of evidence into one number.
+Each decision carries a `reviewer`, and PROOF.md reports the mix rather than a
+single review count:
+
+- `human` — somebody read the diff. The dashboard writes this, because that
+  endpoint is a person clicking.
+- `human-adopted` — the owner accepted someone else's review without
+  re-deriving it. A real sign-off, and a weaker claim than the one above.
+- `assistant` — written by tooling, nobody has stood behind it yet.
+
+An assistant reviewing an assistant's diff is not the same evidence as a human
+doing it, and neither is a maintainer waving it through. The whole point of
+this file is to not collapse those into one number.
 
 That level is not redundant. In the sqlite-utils run every one of the eight
 diffs passed its verifiers and proved its regression test, and reading them
