@@ -107,11 +107,17 @@ function verdictSection(v) {
 async function loadDetail(id) {
   selected = id;
   const d = await (await fetch("/api/runs/" + encodeURIComponent(id))).json();
-  const decided = d.decision
-    ? `<span class="decided">Decision: ${pill(d.decision.decision, d.decision.decision === "approve" ? "ok" : "bad")}
-       ${esc(d.decision.note || "")} <i>(${esc(d.decision.decided_at || "")})</i></span>`
-    : `<input id="note" placeholder="optional note">
-       <button class="approve">Approve</button><button class="reject">Reject</button>`;
+  // The buttons stay available after a decision exists. A review is only worth
+  // what its reviewer is worth, so one has to be able to countersign or overturn
+  // another - and deciding through this endpoint is what stamps reviewer: human.
+  // The note is prefilled so countersigning does not silently drop the finding.
+  const prior = d.decision
+    ? `<span class="decided">Recorded: ${pill(d.decision.decision, d.decision.decision === "approve" ? "ok" : "bad")}
+       by <b>${esc(d.decision.reviewer || "human")}</b> <i>(${esc(d.decision.decided_at || "")})</i></span>`
+    : "";
+  const decided = `${prior}
+    <input id="note" placeholder="optional note" value="${esc(d.decision ? d.decision.note || "" : "")}">
+    <button class="approve">Approve</button><button class="reject">Reject</button>`;
   $("#detail").innerHTML = `
     <h2>${esc(d.run_id)}</h2>
     <div id="decide">${decided}</div>
