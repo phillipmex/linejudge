@@ -100,9 +100,23 @@ class StatsTests(TmpDirTestCase):
         self.assertIn("**Runs succeeded:** 2/3", text)
         self.assertIn("**Independently verified pass:** 1/2 (50%)", text)
         self.assertIn("**Total cost:** $0.0900 ($0.0300/task)", text)
-        self.assertIn("| r1 | g1 | SUCCESS | PASS (1) | $0.0400 |", text)
-        self.assertIn("| r2 | g2 | FAILED | FAIL (2) | $0.0300 |", text)
-        self.assertIn("| r3 | g3 | SUCCESS | no verifiers (0) | $0.0200 |", text)
+        # an em dash in the review column means nobody has read that diff yet
+        self.assertIn("| r1 | g1 | SUCCESS | PASS (1) | — | $0.0400 |", text)
+        self.assertIn("| r2 | g2 | FAILED | FAIL (2) | — | $0.0300 |", text)
+        self.assertIn("| r3 | g3 | SUCCESS | no verifiers (0) | — | $0.0200 |", text)
+        self.assertNotIn("Diff reviewed against the issue", text)
+
+    def test_render_folds_in_human_review_decisions(self):
+        self._seed_run("r1", "g1", "SUCCESS", 0.04, passed=True, verifiers=1)
+        self._seed_run("r2", "g2", "SUCCESS", 0.03, passed=True, verifiers=1)
+        for run_id, decision in (("r1", "approve"), ("r2", "reject")):
+            Path(self.tmp, "runs", run_id, "decision.json").write_text(
+                json.dumps({"decision": decision, "note": ""}), encoding="utf-8"
+            )
+        text = stats.render(stats.collect(self.tmp))
+        # a reject sits alongside a passing harness verdict — that gap is the point
+        self.assertIn("**Diff reviewed against the issue:** 1/2 approved", text)
+        self.assertIn("| r2 | g2 | SUCCESS | PASS (1) | reject | $0.0300 |", text)
 
     def test_empty_root_renders_gracefully(self):
         self.assertIn("No runs recorded", stats.render(stats.collect(self.tmp)))

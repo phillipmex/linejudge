@@ -109,6 +109,13 @@ with the fix removed — but that only shows the test depends on the change. It
 cannot tell you the change addresses the *reported* problem rather than
 something adjacent the agent found easier to satisfy. Read the diffs against
 the issue — `linejudge dashboard` exists for exactly that, and the
-approve/reject decision it records is the human half of the verdict.
+approve/reject decision it records in `runs/<id>/decision.json` is the human
+half of the verdict. `stats.py` folds those decisions into PROOF.md, so a diff
+nobody has read shows an em dash rather than quietly counting as clean.
+
+That level is not redundant. In the sqlite-utils run every one of the eight
+diffs passed its verifiers and proved its regression test, and reading them
+still turned up a fix that regressed the case it was not testing and another
+that resolved the issue's title rather than its body.
 
 Claiming more than this would be the sort of thing linejudge was built to catch.
