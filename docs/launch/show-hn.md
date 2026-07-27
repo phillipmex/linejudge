@@ -14,11 +14,40 @@ checks (or doesn't), then reports its own result, and the harness believes it.
 The agent grades its own homework.
 
 Linejudge splits the roles. Your agent plays the point; the harness calls the
-lines. You declare verifiers in the goal file — shell commands, files that
-must exist, diff constraints (max files/lines, path allow/deny), HTTP checks —
-and the harness executes them *outside the agent session, after it ends*,
-against the artifacts on disk. The agent can't see, influence, or spoof the
-verdict. Run status comes from verdict.json, never from the agent's report.
+lines. You declare verifiers in the goal file — shell commands, files that must
+exist, diff constraints (max files/lines, path allow/deny), HTTP checks — and
+the harness executes them *outside the agent session, after it ends*, against
+the artifacts on disk. The agent can't see, influence, or spoof the verdict.
+Run status comes from verdict.json, never from the agent's report.
+
+To find out what that's actually worth, I ran it against eight real open issues
+from sqlite-utils. The result is the reason I'm posting.
+
+All eight patches passed the project's full test suite. All eight stayed inside
+their declared blast radius. All eight shipped a regression test that provably
+fails with the fix reverted and passes with it applied. Three independent
+machine gates, 8/8 on every one.
+
+Then the diffs got read next to the issues they claimed to close, and two of
+them don't fix the bug:
+
+- Issue 439 (misleading progress bar on utf-16): the patch moves byte counting
+  to utf-8-sig. It fixes utf-16 and regresses the default path — a plain utf-8
+  CSV that is 708 bytes on disk reports 1011, where the previous code was
+  exact. The added regression test only covers utf-16-le.
+- Issue 762 (transform drops CHECK constraints): the constraint parser masks
+  string literals and quoted identifiers but not SQL comments, so a
+  commented-out `-- CHECK (id > 0)` is scanned as live text and re-emitted as
+  an active constraint. A table that accepted id = -1 starts rejecting it. The
+  agent's own report openly defers the comment case; the run was still green.
+
+Neither is reachable by a test suite that doesn't already know about the bug.
+That's the honest shape of the problem: machine verification is necessary, it
+is not sufficient, and the two should never be reported as one number. So
+PROOF.md reports them separately — runs succeeded 7/8, independently verified
+pass 8/8, regression test proven 8/8, diff reviewed against the issue 6/8 — and
+it distinguishes which review decisions a human derived from which were drafted
+by an assistant and adopted.
 
 Other things it does:
 
@@ -36,14 +65,13 @@ Other things it does:
 
 It's Python stdlib only (zero dependencies, every file ≤300 lines — you can
 read the whole engine in an afternoon), Apache-2.0, works with Claude Code
-headless today, and the adapter contract is one method, so any agent CLI can
-be wrapped in ~90 lines.
+headless today, and the adapter contract is one method, so any agent CLI can be
+wrapped in ~90 lines.
 
-The demo is the pitch: `python proofs/demo.py` runs three mock-agent tasks,
-one of which lies about success. The verifier catches it. The generated
-PROOF.md reports "runs succeeded" and "independently verified pass %" as
-separate numbers, because they're separate facts.
+If you'd rather not spend tokens to see it work: `python proofs/demo.py` runs
+three mock-agent tasks, one of which lies about success and produces nothing.
+The verifier checks the disk and fails the run.
 
 Happy to answer questions about the design — especially the deliberate
-omissions (no LLM-as-judge verifier yet: it reintroduces model-grades-model,
-so it's deferred until it can be labeled as the weaker evidence class it is).
+omissions (no LLM-as-judge verifier yet: it reintroduces model-grades-model, so
+it's deferred until it can be labeled as the weaker evidence class it is).
