@@ -6,6 +6,12 @@ All notable changes to linejudge are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-27
+
+The release that carries the sqlite-utils proof run. Minor rather than patch:
+path redaction changes the contents of committed artifacts, and the artifacts
+are the API.
+
 ### Added
 
 - **Path redaction in the run trail** — absolute paths from the machine that
@@ -13,6 +19,30 @@ All notable changes to linejudge are documented here. The format follows
   `<harness-root>` / `<home>` across every committed artifact, so a published
   trail does not leak local filesystem layout. `cleanup.json` keeps real paths
   (teardown reads them back) and is now gitignored instead.
+- **Human-adopted reviewer state** — `decision.json` distinguishes a review the
+  project owner derived independently (`reviewer: human`) from one drafted by
+  an assistant and adopted by the owner, so `PROOF.md` can state the provenance
+  of its own verdicts instead of implying every call was human-made.
+- **Published evidence** — `PROOF.md` now reports the eight-issue sqlite-utils
+  run: 7/8 succeeded, 8/8 independently verified, 8/8 regression-test proven,
+  6/8 diff-reviewed. The two rejects are walked through in full at
+  <https://phillipmex.github.io/linejudge/>.
+
+### Fixed
+
+- **`--version` no longer lies.** It was a hardcoded string in
+  `src/linejudge/__init__.py` that drifted from `pyproject.toml`; a 0.2.0
+  install reported `linejudge 0.1.0`. It now reads the installed package
+  metadata, and falls back to `0.0.0+source` when run from a source tree.
+
+### Changed
+
+- **README leads with the result** rather than the mock demo — three machine
+  gates passed 8/8 and reading the diffs still found two patches that don't fix
+  the bug. The zero-cost demo moved below it as the try-it-now path.
+- **`pytest` works from the repo root.** Collection previously walked into
+  `proofs/targets/` and died on a vendored suite's third-party imports;
+  `testpaths`/`norecursedirs` now scope it to `tests/`.
 
 ## [0.1.0] — 2026-07-21
 

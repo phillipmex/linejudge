@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "linejudge"
-version = "0.1.0"
+version = "0.2.0"
 description = "The independent line judge for coding agents - runs your agent, then verifies its work itself. Never trust the player's call."
 readme = "README.md"
 requires-python = ">=3.10"
