@@ -1,0 +1,9 @@
+{
+  "run": "20260726-204351-issue-479-operationalerror-cannot-vacuum-from-with",
+  "result": "PROVEN",
+  "files": [
+    "tests/test_create.py"
+  ],
+  "before": "1 failed, 197 passed, 1 skipped in 1.24s",
+  "after": "198 passed, 1 skipped in 1.13s"
+}

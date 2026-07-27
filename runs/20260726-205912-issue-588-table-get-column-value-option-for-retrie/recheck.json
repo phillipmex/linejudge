@@ -1,0 +1,9 @@
+{
+  "run": "20260726-205912-issue-588-table-get-column-value-option-for-retrie",
+  "result": "PROVEN",
+  "files": [
+    "tests/test_get.py"
+  ],
+  "before": "3 failed, 6 passed in 0.26s",
+  "after": "9 passed in 0.23s"
+}

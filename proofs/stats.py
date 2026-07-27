@@ -29,6 +29,9 @@ def collect(root):
             verdict = json.loads((run_dir / "verdict.json").read_text(encoding="utf-8"))
         if (run_dir / "outcome.json").exists():
             outcome = json.loads((run_dir / "outcome.json").read_text(encoding="utf-8"))
+        recheck = {}
+        if (run_dir / "recheck.json").exists():
+            recheck = json.loads((run_dir / "recheck.json").read_text(encoding="utf-8"))
         rows.append({
             "run_id": rec["run_id"],
             "goal": rec.get("goal", "?"),
@@ -38,6 +41,7 @@ def collect(root):
             "verifier_count": len(verdict.get("verifiers", [])),
             "failures": outcome.get("failures", []),
             "model": rec.get("model"),
+            "recheck": recheck.get("result"),
         })
     return rows
 
@@ -61,6 +65,18 @@ def render(rows, notional_cost=False):
         + (" — every task judged by verifiers, not by the agent's claim"
            if judged else ""),
     ]
+    # proofs/recheck.py replays each diff twice against a clean baseline; a
+    # PROVEN run is one whose regression test fails with the fix removed. This
+    # is the only line here that says anything about the *bug*, as opposed to
+    # the suite staying green.
+    rechecked = [r for r in rows if r["recheck"]]
+    if rechecked:
+        proven = sum(1 for r in rechecked if r["recheck"] == "PROVEN")
+        lines.append(
+            f"- **Regression test proven:** {proven}/{len(rechecked)} — the added "
+            "test fails with the fix removed and passes with it (`proofs/recheck.py`)"
+        )
+
     # Only claim a model when every run agrees on one; a mixed or unrecorded set
     # would make the line a guess.
     models = {r["model"] for r in rows}

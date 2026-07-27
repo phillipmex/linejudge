@@ -3,6 +3,7 @@
 - **Tasks run:** 8
 - **Runs succeeded:** 7/8
 - **Independently verified pass:** 8/8 (100%) — every task judged by verifiers, not by the agent's claim
+- **Regression test proven:** 8/8 — the added test fails with the fix removed and passes with it (`proofs/recheck.py`)
 - **Cost:** withheld — this run was billed to a Claude subscription, not per-token API credit, so the ledger's dollar figures are notional and are not published as costs.
 
 | run | goal | status | harness verdict |

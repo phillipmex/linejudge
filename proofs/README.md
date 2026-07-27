@@ -58,6 +58,22 @@ linejudge run proofs/goals-NAME/<goal>.md      # one run per goal
 python proofs/stats.py --root . > PROOF.md
 ```
 
+## 4. Check the regression tests actually regress
+
+```
+python proofs/recheck.py --root . \
+  --repo proofs/targets/NAME \
+  --python /abs/path/to/proofs/targets/venv/Scripts/python.exe \
+  --worktree /tmp/recheck-wt
+```
+
+Replays each run's diff twice against a clean baseline worktree: test files
+only (they must **fail** — they need the fix) and then the whole diff (they
+must **pass**). A run whose test passes on unfixed code is `NOT-PROVEN` —
+the verdict still stands, but that test is evidence of nothing. Results land
+in each run's `recheck.json` and `stats.py` folds them into PROOF.md, so
+re-render after running it.
+
 ## Rehearse before you spend
 
 With neither `ANTHROPIC_API_KEY` nor `CLAUDE_CONFIG_DIR` set, `claude -p` bills
@@ -88,8 +104,11 @@ files it had no business touching, an agent that changed nothing at all.
 
 It is *not* proof the reported bug is fixed. A pre-existing suite passes on
 unfixed code too. Requiring a regression test (the `--note` above) shifts the
-odds, but nothing here verifies that the new test genuinely failed beforehand.
-Read the diffs — `linejudge dashboard` exists for exactly that, and the
+odds, and `recheck.py` closes the obvious hole by proving the new test fails
+with the fix removed — but that only shows the test depends on the change. It
+cannot tell you the change addresses the *reported* problem rather than
+something adjacent the agent found easier to satisfy. Read the diffs against
+the issue — `linejudge dashboard` exists for exactly that, and the
 approve/reject decision it records is the human half of the verdict.
 
 Claiming more than this would be the sort of thing linejudge was built to catch.

@@ -1,0 +1,9 @@
+{
+  "run": "20260726-210223-issue-602-sqlite-utils-transform-removes-the-autoi",
+  "result": "PROVEN",
+  "files": [
+    "tests/test_transform.py"
+  ],
+  "before": "1 failed, 77 passed in 0.40s",
+  "after": "78 passed in 0.39s"
+}

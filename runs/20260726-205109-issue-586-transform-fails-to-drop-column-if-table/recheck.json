@@ -1,0 +1,10 @@
+{
+  "run": "20260726-205109-issue-586-transform-fails-to-drop-column-if-table",
+  "result": "PROVEN",
+  "files": [
+    "tests/test_cli.py",
+    "tests/test_transform.py"
+  ],
+  "before": "3 failed, 280 passed, 3 skipped in 11.29s",
+  "after": "283 passed, 3 skipped in 12.15s"
+}

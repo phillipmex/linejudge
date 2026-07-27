@@ -1,0 +1,9 @@
+{
+  "run": "20260726-204559-issue-488-sqlite-utils-transform-should-set-empty",
+  "result": "PROVEN",
+  "files": [
+    "tests/test_transform.py"
+  ],
+  "before": "7 failed, 70 passed in 0.48s",
+  "after": "77 passed in 0.36s"
+}

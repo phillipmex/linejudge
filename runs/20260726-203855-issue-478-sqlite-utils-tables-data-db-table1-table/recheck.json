@@ -1,0 +1,9 @@
+{
+  "run": "20260726-203855-issue-478-sqlite-utils-tables-data-db-table1-table",
+  "result": "PROVEN",
+  "files": [
+    "tests/test_cli.py"
+  ],
+  "before": "2 failed, 204 passed, 3 skipped in 29.07s",
+  "after": "206 passed, 3 skipped in 11.84s"
+}
