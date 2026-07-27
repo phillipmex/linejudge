@@ -28,6 +28,12 @@ linejudge = "linejudge.cli:main"
 [project.urls]
 Homepage = "https://github.com/phillipmex/linejudge"
 
+[tool.pytest.ini_options]
+# Bare `pytest` must not walk into vendored proof targets or run worktrees --
+# those are third-party suites with their own dependencies.
+testpaths = ["tests"]
+norecursedirs = ["proofs/targets", "runs", ".git"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
