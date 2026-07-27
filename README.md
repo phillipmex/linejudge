@@ -181,7 +181,7 @@ separate numbers, because they are separate facts.
 
 ## Status
 
-v0.1.0. 96 tests, CI on Windows + Ubuntu × Python
+v0.2.0. 104 tests, CI on Windows + Ubuntu × Python
 3.10/3.12, zero runtime dependencies.
 
 ## License
