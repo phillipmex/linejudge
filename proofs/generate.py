@@ -41,7 +41,7 @@ def fetch_issues(repo, limit):
 
 
 def goal_text(issue, repo, verifiers=(), extra_tags=(), write_repo=None,
-              timeout_secs=None, notes=()):
+              timeout_secs=None, notes=(), model=None):
     number = issue["number"]
     name = f"issue-{number}-{slugify(issue.get('title', ''))}"
     tags = ["proof", _clean_tag(repo)] if repo else ["proof"]
@@ -60,6 +60,8 @@ def goal_text(issue, repo, verifiers=(), extra_tags=(), write_repo=None,
         lines.append(f"write_repo: {write_repo}")
     if timeout_secs:
         lines.append(f"timeout_secs: {timeout_secs}")
+    if model:
+        lines.append(f"model: {_clean_tag(model)}")
     lines.append("---")
     body = (issue.get("body") or "").strip()
     lines += [
@@ -74,13 +76,13 @@ def goal_text(issue, repo, verifiers=(), extra_tags=(), write_repo=None,
 
 
 def write_goals(issues, out_dir, repo, verifiers=(), extra_tags=(),
-                write_repo=None, timeout_secs=None, notes=()):
+                write_repo=None, timeout_secs=None, notes=(), model=None):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     for issue in issues:
         name, text = goal_text(issue, repo, verifiers, extra_tags,
-                               write_repo, timeout_secs, notes)
+                               write_repo, timeout_secs, notes, model)
         path = out_dir / f"{name}.md"
         path.write_text(text, encoding="utf-8", newline="\n")
         paths.append(path)
@@ -100,6 +102,7 @@ def main(argv=None):
     parser.add_argument("--timeout", type=int, help="per-goal timeout_secs")
     parser.add_argument("--note", action="append", default=[],
                         help="agent_notes line (repeatable)")
+    parser.add_argument("--model", help="adapter model override written into each goal")
     args = parser.parse_args(argv)
 
     if args.from_json:
@@ -111,7 +114,7 @@ def main(argv=None):
 
     paths = write_goals(issues[:args.limit], args.out, args.repo or "",
                         args.verifier, args.tag, args.write_repo, args.timeout,
-                        args.note)
+                        args.note, args.model)
     for p in paths:
         print(p)
     print(f"{len(paths)} goal files in {args.out}")

@@ -33,6 +33,9 @@ def record(root, run_dir, run_id, goal, status, calls):
         "goal": goal.name,
         "tags": goal.tags,
         "status": status,
+        # which model produced the verdict — absent when the goal set no
+        # override and the run inherited whatever the CLI defaulted to
+        "model": goal.model,
         "total_cost_usd": round(total, 6),
         "num_calls": len(entries),
     }

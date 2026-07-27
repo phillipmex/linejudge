@@ -131,7 +131,8 @@ Fix the config loader crash on empty YAML files. …
 | [Comparison](docs/comparison.md) | vs bare `claude -p` loops, Aider, OpenHands, hosted agents |
 | [Governance templates](docs/governance-templates.md) | constitution + definition-of-done for agent fleets |
 | [ADR-0001](docs/adr/ADR-0001-lineage-and-open-core.md) | lineage and open-core rationale |
-| [Sample PROOF.md](docs/PROOF-sample.md) | the claim-vs-verdict gap, rendered |
+| [PROOF.md](PROOF.md) | real run: 8 curated sqlite-utils issues, independently verified |
+| [Sample PROOF.md](docs/PROOF-sample.md) | the claim-vs-verdict gap, rendered from the mock demo |
 
 ## Proof harness
 

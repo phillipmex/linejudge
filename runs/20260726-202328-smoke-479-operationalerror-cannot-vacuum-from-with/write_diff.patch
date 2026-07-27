@@ -1,0 +1,56 @@
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..3cdfea3 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -1896,7 +1896,13 @@ class Database:
+                     existing_indexes.add(fk.columns)
+ 
+     def vacuum(self) -> None:
+-        "Run a SQLite ``VACUUM`` against the database."
++        """
++        Run a SQLite ``VACUUM`` against the database.
++
++        :raises TransactionError: if called while a transaction is open - VACUUM
++          cannot be used within a transaction
++        """
++        self._ensure_no_open_transaction("vacuum()")
+         self.execute("VACUUM;")
+ 
+     def analyze(self, name: Optional[str] = None) -> None:
+diff --git a/tests/test_create.py b/tests/test_create.py
+index d281eb4..c053ad3 100644
+--- a/tests/test_create.py
++++ b/tests/test_create.py
+@@ -11,6 +11,7 @@ from sqlite_utils.db import (
+     View,
+     NoTable,
+     NoView,
++    TransactionError,
+ )
+ from sqlite_utils.utils import hash_record, sqlite3
+ import collections
+@@ -1170,6 +1171,24 @@ def test_vacuum(fresh_db):
+     fresh_db.vacuum()
+ 
+ 
++def test_vacuum_raises_error_within_transaction(fresh_db):
++    fresh_db["data"].insert({"foo": "foo", "bar": "bar"})
++    fresh_db.begin()
++    with pytest.raises(TransactionError) as ex:
++        fresh_db.vacuum()
++    assert "vacuum()" in str(ex.value)
++    assert "transaction" in str(ex.value).lower()
++    fresh_db.rollback()
++
++
++def test_vacuum_raises_error_within_atomic(fresh_db):
++    fresh_db["data"].insert({"foo": "foo", "bar": "bar"})
++    with pytest.raises(TransactionError) as ex:
++        with fresh_db.atomic():
++            fresh_db.vacuum()
++    assert "vacuum()" in str(ex.value)
++
++
+ def test_works_with_pathlib_path(tmpdir):
+     path = pathlib.Path(tmpdir / "test.db")
+     db = Database(path)

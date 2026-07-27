@@ -31,10 +31,16 @@ python proofs/generate.py \
   --repo OWNER/NAME --limit 8 --out proofs/goals-NAME \
   --write-repo /abs/path/to/proofs/targets/NAME \
   --timeout 900 \
+  --model claude-sonnet-5 \
   --verifier "command: /abs/path/to/proofs/targets/venv/Scripts/python.exe -m pytest -q" \
   --verifier "diff_constraints: max_files=10 max_lines=800 deny=.github/*" \
   --note "Add or update a test that fails before your fix and passes after it."
 ```
+
+`--model` writes a `model:` line into every goal, which the adapter passes
+through as `claude --model`. Omit it and each run uses whatever the CLI
+defaults to — record the model in the goal instead, so the proof says which
+one produced the verdict.
 
 Use `--from-json issues.json` instead of `--repo` to curate the issue list by
 hand (recommended — see below).

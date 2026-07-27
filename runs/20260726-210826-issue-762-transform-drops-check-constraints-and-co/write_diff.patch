@@ -1,0 +1,430 @@
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..d9cf94d 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -479,6 +479,155 @@ def _first_keyword(sql: str) -> str:
+     return sql[i:j].upper()
+ 
+ 
++_CHECK_KEYWORD_RE = re.compile(r"\bCHECK\b", re.IGNORECASE)
++_IDENTIFIER_WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
++_QUOTE_PAIRS = {'"': '"', "`": "`", "[": "]"}
++
++
++def _mask_quoted_regions(sql: str) -> str:
++    """
++    Return a copy of ``sql`` with the contents of every quoted region
++    (string literals and quoted identifiers) replaced with ``x`` characters,
++    preserving the original length and the position of everything else.
++    Used so that keyword and paren-matching scans do not get confused by
++    ``CHECK``-like text or parentheses that appear inside a string literal.
++    """
++    chars = list(sql)
++    i, n = 0, len(sql)
++    quote_chars = {"'", *_QUOTE_PAIRS.keys()}
++    while i < n:
++        ch = sql[i]
++        if ch in quote_chars:
++            end_char = _QUOTE_PAIRS.get(ch, "'")
++            start = i
++            j = i + 1
++            while j < n:
++                if sql[j] == end_char:
++                    if j + 1 < n and sql[j + 1] == end_char:
++                        j += 2
++                        continue
++                    j += 1
++                    break
++                j += 1
++            for k in range(start, min(j, n)):
++                chars[k] = "x"
++            i = j
++        else:
++            i += 1
++    return "".join(chars)
++
++
++def _extract_check_constraints(create_table_sql: str) -> List[str]:
++    """
++    Given the SQL of a ``CREATE TABLE`` statement, return a list of the raw
++    text of every ``CHECK (...)`` constraint it contains (including the
++    outer parentheses, excluding the ``CHECK`` keyword itself). SQLite does
++    not expose check constraints via any PRAGMA, so they can only be
++    recovered by parsing the original SQL.
++    """
++    masked = _mask_quoted_regions(create_table_sql)
++    results = []
++    for match in _CHECK_KEYWORD_RE.finditer(masked):
++        pos = match.end()
++        while pos < len(masked) and masked[pos].isspace():
++            pos += 1
++        if pos >= len(masked) or masked[pos] != "(":
++            continue
++        depth = 0
++        j = pos
++        while j < len(masked):
++            if masked[j] == "(":
++                depth += 1
++            elif masked[j] == ")":
++                depth -= 1
++                if depth == 0:
++                    break
++            j += 1
++        else:
++            continue  # pragma: no cover - unbalanced parens, malformed SQL
++        results.append(create_table_sql[pos : j + 1])
++    return results
++
++
++def _rewrite_check_expression(
++    expr: str, rename_folded: Dict[str, str], drop_folded: Set[str]
++) -> Tuple[str, bool]:
++    """
++    Rewrite column references within a ``CHECK (...)`` expression to account
++    for renamed columns, and report whether it references a dropped column.
++
++    Bare and quoted identifiers that case-insensitively match a column name
++    are treated as column references, unless immediately followed by ``(``
++    in which case they are treated as a function call instead - this means
++    a column named e.g. ``length`` will not be confused with a reference to
++    the ``length()`` SQL function.
++
++    Returns a tuple of ``(rewritten_expression, references_dropped_column)``.
++    """
++    out = []
++    references_dropped = False
++    i, n = 0, len(expr)
++    while i < n:
++        ch = expr[i]
++        if ch == "'":
++            j = i + 1
++            while j < n:
++                if expr[j] == "'":
++                    if j + 1 < n and expr[j + 1] == "'":
++                        j += 2
++                        continue
++                    j += 1
++                    break
++                j += 1
++            out.append(expr[i:j])
++            i = j
++            continue
++        if ch in _QUOTE_PAIRS:
++            end_char = _QUOTE_PAIRS[ch]
++            j = i + 1
++            while j < n:
++                if expr[j] == end_char:
++                    if j + 1 < n and expr[j + 1] == end_char:
++                        j += 2
++                        continue
++                    j += 1
++                    break
++                j += 1
++            inner = expr[i + 1 : j - 1] if j <= n and expr[j - 1] == end_char else expr[i + 1 : j]
++            inner = inner.replace(end_char * 2, end_char)
++            folded = fold_identifier_case(inner)
++            if folded in drop_folded:
++                references_dropped = True
++            if folded in rename_folded:
++                new_name = rename_folded[folded]
++                out.append(ch + new_name.replace(end_char, end_char * 2) + end_char)
++            else:
++                out.append(expr[i:j])
++            i = j
++            continue
++        match = _IDENTIFIER_WORD_RE.match(expr, i)
++        if match:
++            word = match.group(0)
++            end = match.end()
++            k = end
++            while k < n and expr[k] in " \t\r\n":
++                k += 1
++            is_call = k < n and expr[k] == "("
++            folded = fold_identifier_case(word)
++            if not is_call and folded in drop_folded:
++                references_dropped = True
++                out.append(word)
++            elif not is_call and folded in rename_folded:
++                out.append(rename_folded[folded])
++            else:
++                out.append(word)
++            i = end
++            continue
++        out.append(ch)
++        i += 1
++    return "".join(out), references_dropped
++
++
+ class Database:
+     """
+     Wrapper for a SQLite database connection that adds a variety of useful utility methods.
+@@ -1400,6 +1549,8 @@ class Database:
+         extracts: Optional[Union[Dict[str, str], List[str]]] = None,
+         if_not_exists: bool = False,
+         strict: bool = False,
++        unique: Optional[Iterable[Union[str, Tuple[str, ...]]]] = None,
++        checks: Optional[Iterable[str]] = None,
+     ) -> str:
+         """
+         Returns the SQL ``CREATE TABLE`` statement for creating the specified table.
+@@ -1416,6 +1567,8 @@ class Database:
+         :param extracts: List or dictionary of columns to be extracted during inserts, see :ref:`python_api_extracts`
+         :param if_not_exists: Use ``CREATE TABLE IF NOT EXISTS``
+         :param strict: Apply STRICT mode to table
++        :param unique: List of columns that should be UNIQUE, or tuples of column names for compound UNIQUE constraints
++        :param checks: List of raw ``CHECK (...)`` constraint expressions (including the parentheses) to add to the table
+         """
+         if hash_id_columns and (hash_id is None):
+             hash_id = "id"
+@@ -1481,6 +1634,21 @@ class Database:
+                         "No such column: {}.{}".format(fk.other_table, other_column)
+                     )
+ 
++        # Normalize unique= into single-column (inline UNIQUE) and compound
++        # (table-level UNIQUE (...)) groups
++        unique_single_columns: Set[str] = set()
++        unique_compound: List[Tuple[str, ...]] = []
++        all_column_names = [c[0] for c in column_items]
++        for entry in unique or []:
++            resolved_entry = tuple(
++                resolve_casing(c, all_column_names)
++                for c in ((entry,) if isinstance(entry, str) else entry)
++            )
++            if len(resolved_entry) == 1:
++                unique_single_columns.add(resolved_entry[0])
++            else:
++                unique_compound.append(resolved_entry)
++
+         column_defs = []
+         # ensure pk is a tuple
+         single_pk = None
+@@ -1511,6 +1679,8 @@ class Database:
+                         _fk_actions_sql(fk),
+                     )
+                 )
++            if column_name in unique_single_columns:
++                column_extras.append("UNIQUE")
+             column_type_str = COLUMN_TYPE_MAPPING[column_type]
+             # Special case for strict tables to map FLOAT to REAL
+             # Refs https://github.com/simonw/sqlite-utils/issues/644
+@@ -1550,6 +1720,17 @@ class Database:
+                     actions=_fk_actions_sql(fk),
+                 )
+             )
++        # Compound UNIQUE constraints, and raw CHECK constraints (used to
++        # preserve constraints round-tripped from an existing table by
++        # transform_sql(), since SQLite exposes neither via any PRAGMA)
++        for cols in unique_compound:
++            column_defs.append(
++                "   UNIQUE ({columns})".format(
++                    columns=", ".join(quote_identifier(c) for c in cols)
++                )
++            )
++        for check in checks or []:
++            column_defs.append("   CHECK {check}".format(check=check))
+         columns_sql = ",\n".join(column_defs)
+         sql = """CREATE TABLE {if_not_exists}{table} (
+ {columns_sql}{extra_pk}
+@@ -2842,6 +3023,36 @@ class Table(Queryable):
+         if column_order is not None:
+             column_order = [rename.get(col) or col for col in column_order]
+ 
++        # Preserve CHECK constraints from the original CREATE TABLE statement -
++        # SQLite does not expose these via any PRAGMA, so we parse them out of
++        # the schema text directly and drop/rewrite them to match any dropped
++        # or renamed columns.
++        drop_folded_for_checks = {fold_identifier_case(c) for c in drop}
++        rename_folded_for_checks = {
++            fold_identifier_case(c): new_name for c, new_name in rename.items()
++        }
++        create_table_checks = []
++        for expr in _extract_check_constraints(self.schema):
++            new_expr, references_dropped = _rewrite_check_expression(
++                expr, rename_folded_for_checks, drop_folded_for_checks
++            )
++            if not references_dropped:
++                create_table_checks.append(new_expr)
++
++        # Preserve UNIQUE constraints backed by an automatic index - these
++        # have no CREATE INDEX statement in sqlite_master (index.origin ==
++        # "u"), so they can't be re-added by the index-rebuild step below and
++        # must be reproduced as inline/table-level UNIQUE constraints instead.
++        create_table_unique: List[Tuple[str, ...]] = []
++        for index in self.indexes:
++            if index.origin != "u":
++                continue
++            if any(col in drop for col in index.columns):
++                continue
++            create_table_unique.append(
++                tuple(rename.get(col) or col for col in index.columns)
++            )
++
+         sqls = []
+         sqls.append(
+             self.db.create_table_sql(
+@@ -2853,6 +3064,8 @@ class Table(Queryable):
+                 foreign_keys=create_table_foreign_keys,
+                 column_order=column_order,
+                 strict=self.strict if strict is None else strict,
++                unique=create_table_unique,
++                checks=create_table_checks,
+             ).strip()
+         )
+ 
+@@ -2890,6 +3103,9 @@ class Table(Queryable):
+         )
+         # Re-add existing indexes
+         for index in self.indexes:
++            if index.origin == "u":
++                # Handled above via the unique= argument to create_table_sql()
++                continue
+             if index.origin != "pk":
+                 index_sql = self.db.execute(
+                     """SELECT sql FROM sqlite_master WHERE type = 'index' AND name = :index_name;""",
+diff --git a/tests/test_transform.py b/tests/test_transform.py
+index 362f1ca..ad66955 100644
+--- a/tests/test_transform.py
++++ b/tests/test_transform.py
+@@ -892,15 +892,133 @@ def test_transform_with_unique_constraint_implicit_index(fresh_db):
+     """)
+     dogs.insert({"id": 1, "name": "Cleo", "age": 5})
+ 
+-    # Attempt to transform the table without modifying 'name'
+-    with pytest.raises(TransformError) as excinfo:
+-        dogs.transform(types={"age": str})
++    # The UNIQUE constraint should be preserved as an inline column
++    # constraint on the rebuilt table, rather than raising a TransformError
++    dogs.transform(types={"age": str})
++
++    assert dogs.schema == (
++        'CREATE TABLE "dogs" (\n'
++        '   "id" INTEGER PRIMARY KEY,\n'
++        '   "name" TEXT UNIQUE,\n'
++        '   "age" TEXT\n'
++        ")"
++    )
++    with pytest.raises(sqlite3.IntegrityError):
++        dogs.insert({"id": 2, "name": "Cleo", "age": 6})
+ 
+-    assert (
+-        "Index 'sqlite_autoindex_dogs_1' on table 'dogs' does not have a CREATE INDEX statement."
+-        in str(excinfo.value)
++
++def test_transform_unique_constraint_dropped_with_column(fresh_db):
++    fresh_db.execute("""
++        CREATE TABLE dogs (
++            id INTEGER PRIMARY KEY,
++            name TEXT UNIQUE,
++            age INTEGER
++        );
++    """)
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": 5})
++
++    dogs.transform(drop={"name"})
++
++    assert dogs.schema == (
++        'CREATE TABLE "dogs" (\n   "id" INTEGER PRIMARY KEY,\n   "age" INTEGER\n)'
+     )
+-    assert (
+-        "You must manually drop this index prior to running this transformation and manually recreate the new index after running this transformation."
+-        in str(excinfo.value)
++    assert [i for i in dogs.indexes if i.origin == "u"] == []
++
++
++def test_transform_compound_unique_constraint_implicit_index(fresh_db):
++    fresh_db.execute("""
++        CREATE TABLE dogs (
++            id INTEGER PRIMARY KEY,
++            name TEXT,
++            age INTEGER,
++            UNIQUE (name, age)
++        );
++    """)
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": 5})
++
++    dogs.transform(rename={"age": "dog_age"})
++
++    assert dogs.schema == (
++        'CREATE TABLE "dogs" (\n'
++        '   "id" INTEGER PRIMARY KEY,\n'
++        '   "name" TEXT,\n'
++        '   "dog_age" INTEGER,\n'
++        '   UNIQUE ("name", "dog_age")\n'
++        ")"
++    )
++    with pytest.raises(sqlite3.IntegrityError):
++        dogs.insert({"id": 2, "name": "Cleo", "dog_age": 5})
++    # Different dog_age should be fine
++    dogs.insert({"id": 3, "name": "Cleo", "dog_age": 6})
++
++
++def test_transform_preserves_check_constraint(fresh_db):
++    fresh_db.execute("""
++        CREATE TABLE dogs (
++            id INTEGER PRIMARY KEY,
++            name TEXT,
++            age INTEGER CHECK (age >= 0)
++        );
++    """)
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": 5})
++
++    dogs.transform(types={"name": str})
++
++    assert dogs.schema == (
++        'CREATE TABLE "dogs" (\n'
++        '   "id" INTEGER PRIMARY KEY,\n'
++        '   "name" TEXT,\n'
++        '   "age" INTEGER,\n'
++        "   CHECK (age >= 0)\n"
++        ")"
++    )
++    with pytest.raises(sqlite3.IntegrityError):
++        dogs.insert({"id": 2, "name": "Rex", "age": -1})
++
++
++def test_transform_check_constraint_renamed_column(fresh_db):
++    fresh_db.execute("""
++        CREATE TABLE dogs (
++            id INTEGER PRIMARY KEY,
++            name TEXT,
++            age INTEGER CHECK (age >= 0)
++        );
++    """)
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": 5})
++
++    dogs.transform(rename={"age": "dog_age"})
++
++    assert dogs.schema == (
++        'CREATE TABLE "dogs" (\n'
++        '   "id" INTEGER PRIMARY KEY,\n'
++        '   "name" TEXT,\n'
++        '   "dog_age" INTEGER,\n'
++        "   CHECK (dog_age >= 0)\n"
++        ")"
++    )
++    with pytest.raises(sqlite3.IntegrityError):
++        dogs.insert({"id": 2, "name": "Rex", "dog_age": -1})
++
++
++def test_transform_check_constraint_dropped_with_column(fresh_db):
++    fresh_db.execute("""
++        CREATE TABLE dogs (
++            id INTEGER PRIMARY KEY,
++            name TEXT,
++            age INTEGER CHECK (age >= 0)
++        );
++    """)
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": 5})
++
++    dogs.transform(drop={"age"})
++
++    assert dogs.schema == (
++        'CREATE TABLE "dogs" (\n   "id" INTEGER PRIMARY KEY,\n   "name" TEXT\n)'
+     )
++    # No CHECK left to violate now that the column is gone
++    dogs.insert({"id": 2, "name": "Rex"})

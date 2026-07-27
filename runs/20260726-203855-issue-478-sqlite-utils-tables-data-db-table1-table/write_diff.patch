@@ -1,0 +1,120 @@
+diff --git a/docs/cli-reference.rst b/docs/cli-reference.rst
+index 9fafe28..047c834 100644
+--- a/docs/cli-reference.rst
++++ b/docs/cli-reference.rst
+@@ -711,7 +711,7 @@ See :ref:`cli_tables`.
+ 
+ ::
+ 
+-    Usage: sqlite-utils tables [OPTIONS] PATH
++    Usage: sqlite-utils tables [OPTIONS] PATH [TABLES]...
+ 
+       List the tables in the database
+ 
+@@ -719,6 +719,10 @@ See :ref:`cli_tables`.
+ 
+           sqlite-utils tables trees.db
+ 
++      To only show tables matching specific names:
++
++          sqlite-utils tables trees.db trees streets
++
+     Options:
+       --fts4                 Just show FTS4 enabled tables
+       --fts5                 Just show FTS5 enabled tables
+diff --git a/docs/cli.rst b/docs/cli.rst
+index 2e506dd..01587ee 100644
+--- a/docs/cli.rst
++++ b/docs/cli.rst
+@@ -812,6 +812,17 @@ Use ``--schema`` to include the schema of each table:
+ 
+ The ``--nl``, ``--csv``, ``--tsv``, ``--table`` and ``--fmt`` options are also available.
+ 
++To restrict the output to specific tables, list their names after the database file. This is useful with ``--counts`` when your database contains very large tables, since it avoids counting rows in tables you are not interested in:
++
++.. code-block:: bash
++
++    sqlite-utils tables mydb.db dogs cats --counts
++
++.. code-block:: output
++
++    [{"table": "dogs", "count": 12},
++     {"table": "cats", "count": 332}]
++
+ .. note::
+     In Python: :ref:`db.tables or db.table_names() <python_api_tables>`  CLI reference: :ref:`sqlite-utils tables <cli_ref_tables>`
+ 
+diff --git a/sqlite_utils/cli.py b/sqlite_utils/cli.py
+index e0b8969..076d5f9 100644
+--- a/sqlite_utils/cli.py
++++ b/sqlite_utils/cli.py
+@@ -183,6 +183,7 @@ def cli():
+     type=click.Path(exists=True, file_okay=True, dir_okay=False, allow_dash=False),
+     required=True,
+ )
++@click.argument("tables_filter", metavar="TABLES", nargs=-1)
+ @click.option(
+     "--fts4", help="Just show FTS4 enabled tables", default=False, is_flag=True
+ )
+@@ -224,6 +225,7 @@ def tables(
+     schema,
+     load_extension,
+     views=False,
++    tables_filter=(),
+ ):
+     """List the tables in the database
+ 
+@@ -231,6 +233,11 @@ def tables(
+ 
+     \b
+         sqlite-utils tables trees.db
++
++    To only show tables matching specific names:
++
++    \b
++        sqlite-utils tables trees.db trees streets
+     """
+     db = sqlite_utils.Database(path)
+     _register_db_for_cleanup(db)
+@@ -250,6 +257,8 @@ def tables(
+             items = db.view_names()
+         else:
+             items = db.table_names(fts4=fts4, fts5=fts5)
++        if tables_filter:
++            items = [name for name in items if name in tables_filter]
+         for name in items:
+             row: list[Any] = [name]
+             if counts:
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index a2135b0..50c98fe 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -59,6 +59,28 @@ def test_tables(db_path):
+     assert '[{"table": "Gosh"},\n {"table": "Gosh2"}]' == result.output.strip()
+ 
+ 
++def test_tables_specific_tables(db_path):
++    db = Database(db_path)
++    with db.conn:
++        db["lots"].insert_all([{"id": i, "age": i + 1} for i in range(30)])
++    result = CliRunner().invoke(
++        cli.cli, ["tables", db_path, "Gosh2", "lots"], catch_exceptions=False
++    )
++    assert '[{"table": "Gosh2"},\n {"table": "lots"}]' == result.output.strip()
++
++
++def test_tables_specific_tables_counts(db_path):
++    db = Database(db_path)
++    with db.conn:
++        db["lots"].insert_all([{"id": i, "age": i + 1} for i in range(30)])
++    result = CliRunner().invoke(
++        cli.cli,
++        ["tables", db_path, "lots", "--counts"],
++        catch_exceptions=False,
++    )
++    assert '[{"table": "lots", "count": 30}]' == result.output.strip()
++
++
+ def test_views(db_path):
+     Database(db_path).create_view("hello", "select sqlite_version()")
+     result = CliRunner().invoke(cli.cli, ["views", db_path, "--table", "--schema"])

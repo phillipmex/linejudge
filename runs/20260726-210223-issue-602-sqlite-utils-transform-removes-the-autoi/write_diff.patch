@@ -1,0 +1,98 @@
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..f1e7e54 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -1400,6 +1400,7 @@ class Database:
+         extracts: Optional[Union[Dict[str, str], List[str]]] = None,
+         if_not_exists: bool = False,
+         strict: bool = False,
++        pk_autoincrement: bool = False,
+     ) -> str:
+         """
+         Returns the SQL ``CREATE TABLE`` statement for creating the specified table.
+@@ -1416,6 +1417,7 @@ class Database:
+         :param extracts: List or dictionary of columns to be extracted during inserts, see :ref:`python_api_extracts`
+         :param if_not_exists: Use ``CREATE TABLE IF NOT EXISTS``
+         :param strict: Apply STRICT mode to table
++        :param pk_autoincrement: Add ``AUTOINCREMENT`` to the single-column integer primary key
+         """
+         if hash_id_columns and (hash_id is None):
+             hash_id = "id"
+@@ -1496,6 +1498,8 @@ class Database:
+             column_extras = []
+             if column_name == single_pk:
+                 column_extras.append("PRIMARY KEY")
++                if pk_autoincrement and COLUMN_TYPE_MAPPING[column_type] == "INTEGER":
++                    column_extras.append("AUTOINCREMENT")
+             if column_name in not_null:
+                 column_extras.append("NOT NULL")
+             if column_name in defaults and defaults[column_name] is not None:
+@@ -2802,6 +2806,18 @@ class Table(Queryable):
+             else:
+                 pk = pks_renamed
+ 
++        # Preserve AUTOINCREMENT if the existing table has it on its (single) primary
++        # key column and that column survives the transform unchanged in role
++        create_table_pk_autoincrement = False
++        if "AUTOINCREMENT" in self.schema.upper():
++            original_pk_columns = [c.name for c in self.columns if c.is_pk]
++            if len(original_pk_columns) == 1:
++                original_pk = original_pk_columns[0]
++                if original_pk not in drop:
++                    renamed_original_pk = rename.get(original_pk) or original_pk
++                    if pk == renamed_original_pk:
++                        create_table_pk_autoincrement = True
++
+         # not_null may be a set or dict, need to convert to a set
+         create_table_not_null = {
+             rename.get(c.name) or c.name
+@@ -2853,6 +2869,7 @@ class Table(Queryable):
+                 foreign_keys=create_table_foreign_keys,
+                 column_order=column_order,
+                 strict=self.strict if strict is None else strict,
++                pk_autoincrement=create_table_pk_autoincrement,
+             ).strip()
+         )
+ 
+diff --git a/tests/test_transform.py b/tests/test_transform.py
+index 362f1ca..1d653d7 100644
+--- a/tests/test_transform.py
++++ b/tests/test_transform.py
+@@ -226,6 +226,37 @@ def test_transform_rename_pk(fresh_db):
+     )
+ 
+ 
++def test_transform_preserves_autoincrement(fresh_db):
++    # https://github.com/simonw/sqlite-utils/issues/602
++    fresh_db.execute(
++        "CREATE TABLE mytable (col1 INTEGER PRIMARY KEY AUTOINCREMENT, col2 TEXT NOT NULL)"
++    )
++    table = fresh_db["mytable"]
++    table.insert({"col2": "hello"})
++    table.transform(rename={"col2": "renamedcol2"})
++    assert (
++        table.schema
++        == 'CREATE TABLE "mytable" (\n   "col1" INTEGER PRIMARY KEY AUTOINCREMENT,\n   "renamedcol2" TEXT NOT NULL\n)'
++    )
++    # sqlite_sequence tracking should still work after the transform
++    table.delete(1)
++    table.insert({"renamedcol2": "world"})
++    assert [row["col1"] for row in table.rows] == [2]
++
++
++def test_transform_drops_autoincrement_when_pk_changes(fresh_db):
++    fresh_db.execute(
++        "CREATE TABLE mytable (col1 INTEGER PRIMARY KEY AUTOINCREMENT, col2 TEXT NOT NULL)"
++    )
++    table = fresh_db["mytable"]
++    table.insert({"col2": "hello"})
++    table.transform(pk="col2")
++    assert (
++        table.schema
++        == 'CREATE TABLE "mytable" (\n   "col1" INTEGER,\n   "col2" TEXT PRIMARY KEY NOT NULL\n)'
++    )
++
++
+ def test_transform_preserves_keyword_literal_defaults(fresh_db):
+     # transform() used to requote keyword-literal defaults (DEFAULT TRUE became
+     # DEFAULT 'TRUE'), so a default insert stored the text 'TRUE' instead of the

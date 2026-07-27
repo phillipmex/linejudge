@@ -1,0 +1,98 @@
+diff --git a/sqlite_utils/cli.py b/sqlite_utils/cli.py
+index e0b8969..3680ee2 100644
+--- a/sqlite_utils/cli.py
++++ b/sqlite_utils/cli.py
+@@ -1221,7 +1221,7 @@ def insert_upsert_implementation(
+         decoded_buffer = io.TextIOWrapper(file, encoding=encoding)
+ 
+     tracker = None
+-    with file_progress(decoded_buffer, silent=silent) as decoded:
++    with file_progress(decoded_buffer, silent=silent, encoding=encoding) as decoded:
+         if csv or tsv:
+             if sniff:
+                 # Read first 2048 bytes and use that to detect
+diff --git a/sqlite_utils/utils.py b/sqlite_utils/utils.py
+index b39b117..5a16c1c 100644
+--- a/sqlite_utils/utils.py
++++ b/sqlite_utils/utils.py
+@@ -207,24 +207,41 @@ def decode_base64_values(doc: Dict[str, Any]) -> Dict[str, Any]:
+ 
+ 
+ class UpdateWrapper:
+-    def __init__(self, wrapped: io.IOBase, update: Callable[[int], None]) -> None:
++    def __init__(
++        self,
++        wrapped: io.IOBase,
++        update: Callable[[int], None],
++        encoding: str = "utf-8",
++    ) -> None:
+         self._wrapped = wrapped
+         self._update = update
++        self._encoding = encoding
++
++    def _bytes_length(self, value: str) -> int:
++        # The wrapped stream yields decoded text, but the progress bar is
++        # measured against the file's size in bytes - so re-encode to find
++        # out how many bytes this chunk actually consumed. Using len(value)
++        # directly under-reports progress for multi-byte encodings such as
++        # utf-16.
++        return len(value.encode(self._encoding, "replace"))
+ 
+     def __iter__(self) -> Iterator[bytes]:
+         for line in self._wrapped:
+-            self._update(len(line))
++            self._update(self._bytes_length(line))
+             yield line
+ 
+     def read(self, size: int = -1) -> bytes:
+         data = self._wrapped.read(size)
+-        self._update(len(data))
++        self._update(self._bytes_length(data))
+         return data
+ 
+ 
+ @contextlib.contextmanager
+ def file_progress(
+-    file: io.IOBase, silent: bool = False, **kwargs: object
++    file: io.IOBase,
++    silent: bool = False,
++    encoding: str = "utf-8",
++    **kwargs: object,
+ ) -> Generator[Union[io.IOBase, "UpdateWrapper"], None, None]:
+     if silent:
+         yield file
+@@ -240,7 +257,7 @@ def file_progress(
+     else:
+         file_length = os.path.getsize(file.name)  # type: ignore
+         with click.progressbar(length=file_length, **kwargs) as bar:  # type: ignore
+-            yield UpdateWrapper(file, bar.update)
++            yield UpdateWrapper(file, bar.update, encoding=encoding)
+ 
+ 
+ class Format(enum.Enum):
+diff --git a/tests/test_utils.py b/tests/test_utils.py
+index 3de5e94..6ac36e2 100644
+--- a/tests/test_utils.py
++++ b/tests/test_utils.py
+@@ -73,6 +73,21 @@ def test_maximize_csv_field_size_limit():
+     assert rows_list2[0]["text"] == long_value
+ 
+ 
++def test_update_wrapper_counts_bytes_not_characters():
++    # https://github.com/simonw/sqlite-utils/issues/439
++    # Progress is measured in bytes (against the file size on disk), so the
++    # wrapper must report the encoded byte length of each chunk it yields,
++    # not its decoded character length - otherwise multi-byte encodings such
++    # as utf-16 make the progress bar wildly inaccurate.
++    content = "id,name\n1,Cleo\n2,Cardi\n"
++    encoded = content.encode("utf-16-le")
++    updates = []
++    decoded = io.TextIOWrapper(io.BytesIO(encoded), encoding="utf-16-le")
++    wrapper = utils.UpdateWrapper(decoded, updates.append, encoding="utf-16-le")
++    list(wrapper)
++    assert sum(updates) == len(encoded)
++
++
+ @pytest.mark.parametrize(
+     "input,expected",
+     (

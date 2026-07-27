@@ -1,0 +1,86 @@
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..782223a 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -2866,10 +2866,26 @@ class Table(Queryable):
+         if "rowid" not in new_cols:
+             new_cols.insert(0, "rowid")
+             old_cols.insert(0, "rowid")
++
++        # Columns whose type is being explicitly converted to INTEGER/FLOAT/REAL
++        # should have empty strings turned into NULL, otherwise SQLite's type
++        # affinity leaves them as the empty string instead of converting them
++        numeric_sql_types = {"INTEGER", "FLOAT", "REAL"}
++        columns_needing_nullif = {
++            column
++            for column in old_cols
++            if column in types and COLUMN_TYPE_MAPPING.get(types[column]) in numeric_sql_types
++        }
++
++        def old_col_sql(column):
++            if column in columns_needing_nullif:
++                return "nullif({}, '')".format(quote_identifier(column))
++            return quote_identifier(column)
++
+         copy_sql = "INSERT INTO {} ({new_cols})\n   SELECT {old_cols} FROM {};".format(
+             quote_identifier(new_table_name),
+             quote_identifier(self.name),
+-            old_cols=", ".join(quote_identifier(col) for col in old_cols),
++            old_cols=", ".join(old_col_sql(col) for col in old_cols),
+             new_cols=", ".join(quote_identifier(col) for col in new_cols),
+         )
+         sqls.append(copy_sql)
+diff --git a/tests/test_transform.py b/tests/test_transform.py
+index 362f1ca..b2bc148 100644
+--- a/tests/test_transform.py
++++ b/tests/test_transform.py
+@@ -23,7 +23,7 @@ import pytest
+             {"types": {"age": int}},
+             [
+                 'CREATE TABLE "dogs_new_suffix" (\n   "id" INTEGER PRIMARY KEY,\n   "name" TEXT,\n   "age" INTEGER\n);',
+-                'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name", "age")\n   SELECT "rowid", "id", "name", "age" FROM "dogs";',
++                'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name", "age")\n   SELECT "rowid", "id", "name", nullif("age", \'\') FROM "dogs";',
+                 'DROP TABLE "dogs";',
+                 'ALTER TABLE "dogs_new_suffix" RENAME TO "dogs";',
+             ],
+@@ -53,7 +53,7 @@ import pytest
+             {"types": {"age": int}, "rename": {"age": "dog_age"}},
+             [
+                 'CREATE TABLE "dogs_new_suffix" (\n   "id" INTEGER PRIMARY KEY,\n   "name" TEXT,\n   "dog_age" INTEGER\n);',
+-                'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name", "dog_age")\n   SELECT "rowid", "id", "name", "age" FROM "dogs";',
++                'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name", "dog_age")\n   SELECT "rowid", "id", "name", nullif("age", \'\') FROM "dogs";',
+                 'DROP TABLE "dogs";',
+                 'ALTER TABLE "dogs_new_suffix" RENAME TO "dogs";',
+             ],
+@@ -146,7 +146,7 @@ def test_transform_sql_table_with_primary_key(
+             {"types": {"age": int}},
+             [
+                 'CREATE TABLE "dogs_new_suffix" (\n   "id" INTEGER,\n   "name" TEXT,\n   "age" INTEGER\n);',
+-                'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name", "age")\n   SELECT "rowid", "id", "name", "age" FROM "dogs";',
++                'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name", "age")\n   SELECT "rowid", "id", "name", nullif("age", \'\') FROM "dogs";',
+                 'DROP TABLE "dogs";',
+                 'ALTER TABLE "dogs_new_suffix" RENAME TO "dogs";',
+             ],
+@@ -260,6 +260,22 @@ def test_transform_preserves_keyword_literal_defaults(fresh_db):
+     assert after == (1, 0, None)
+ 
+ 
++def test_transform_type_conversion_sets_empty_strings_to_null(fresh_db):
++    # https://github.com/simonw/sqlite-utils/issues/488
++    test = fresh_db["test"]
++    test.insert_all(
++        [
++            {"id": "1", "age": "3", "weight": "2.5"},
++            {"id": "2", "age": "", "weight": ""},
++        ]
++    )
++    test.transform(types={"age": int, "weight": float})
++    assert list(test.rows) == [
++        {"id": "1", "age": 3, "weight": 2.5},
++        {"id": "2", "age": None, "weight": None},
++    ]
++
++
+ def test_transform_not_null(fresh_db):
+     dogs = fresh_db["dogs"]
+     dogs.insert({"id": 1, "name": "Cleo", "age": "5"}, pk="id")

@@ -1,0 +1,238 @@
+diff --git a/docs/cli-reference.rst b/docs/cli-reference.rst
+index 9fafe28..c81d9a3 100644
+--- a/docs/cli-reference.rst
++++ b/docs/cli-reference.rst
+@@ -511,6 +511,8 @@ See :ref:`cli_transform_table`.
+       --strict / --no-strict          Enable or disable STRICT mode (default:
+                                       preserve current mode)
+       --sql                           Output SQL without executing it
++      --recreate-views                Drop and recreate any views that reference
++                                      this table
+       --load-extension TEXT           Path to SQLite extension, with optional
+                                       :entrypoint
+       -h, --help                      Show this message and exit.
+diff --git a/docs/cli.rst b/docs/cli.rst
+index 2e506dd..093af4d 100644
+--- a/docs/cli.rst
++++ b/docs/cli.rst
+@@ -2264,6 +2264,9 @@ Every option for this table (with the exception of ``--pk-none``) can be specifi
+ ``--no-strict``
+     Convert a strict table back to a regular non-strict table.
+ 
++``--recreate-views``
++    Drop any views that reference this table before applying the transformation, then recreate them again afterwards.
++
+ If you want to see the SQL that will be executed to make the change without actually executing it, add the ``--sql`` flag. For example:
+ 
+ .. code-block:: bash
+diff --git a/docs/python-api.rst b/docs/python-api.rst
+index 43b734d..45ca695 100644
+--- a/docs/python-api.rst
++++ b/docs/python-api.rst
+@@ -1795,6 +1795,12 @@ To keep the original table around instead of dropping it, pass the ``keep_table=
+ 
+     table.transform(types={"age": int}, keep_table="original_table")
+ 
++If the table is referenced by any SQL views, transforming it will raise an error unless you pass ``recreate_views=True`` - this will drop those views before the transform and recreate them again once it has completed:
++
++.. code-block:: python
++
++    table.transform(types={"age": int}, recreate_views=True)
++
+ This method raises a ``sqlite_utils.db.TransformError`` exception if the table cannot be transformed, usually because there are existing constraints or indexes that are incompatible with modifications to the columns.
+ 
+ .. note::
+@@ -1991,7 +1997,7 @@ Renaming a column with ``rename=`` updates any foreign keys that use it, and dro
+ Custom transformations with .transform_sql()
+ --------------------------------------------
+ 
+-The ``.transform()`` method can handle most cases, but it does not automatically upgrade indexes, views or triggers associated with the table that is being transformed.
++The ``.transform()`` method can handle most cases, but it does not automatically upgrade indexes or triggers associated with the table that is being transformed - and only recreates views that reference the table if you pass ``recreate_views=True``.
+ 
+ If you want to do something more advanced, you can call the ``table.transform_sql(...)`` method with the same arguments that you would have passed to ``table.transform(...)``.
+ 
+diff --git a/sqlite_utils/cli.py b/sqlite_utils/cli.py
+index e0b8969..25990c9 100644
+--- a/sqlite_utils/cli.py
++++ b/sqlite_utils/cli.py
+@@ -2724,6 +2724,11 @@ def schema(
+     help="Enable or disable STRICT mode (default: preserve current mode)",
+ )
+ @click.option("--sql", is_flag=True, help="Output SQL without executing it")
++@click.option(
++    "--recreate-views",
++    is_flag=True,
++    help="Drop and recreate any views that reference this table",
++)
+ @load_extension_option
+ def transform(
+     path,
+@@ -2742,6 +2747,7 @@ def transform(
+     drop_foreign_keys,
+     strict,
+     sql,
++    recreate_views,
+     load_extension,
+ ):
+     """Transform a table beyond the capabilities of ALTER TABLE
+@@ -2803,6 +2809,7 @@ def transform(
+             drop_foreign_keys=drop_foreign_keys_value,
+             add_foreign_keys=add_foreign_keys_value,
+             strict=strict,
++            recreate_views=recreate_views,
+         ):
+             click.echo(line)
+     else:
+@@ -2817,6 +2824,7 @@ def transform(
+             drop_foreign_keys=drop_foreign_keys_value,
+             add_foreign_keys=add_foreign_keys_value,
+             strict=strict,
++            recreate_views=recreate_views,
+         )
+ 
+ 
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..f62c4b6 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -2515,6 +2515,7 @@ class Table(Queryable):
+         column_order: Optional[List[str]] = None,
+         keep_table: Optional[str] = None,
+         strict: Optional[bool] = None,
++        recreate_views: bool = False,
+     ) -> "Table":
+         """
+         Apply an advanced alter table, including operations that are not supported by
+@@ -2544,6 +2545,9 @@ class Table(Queryable):
+           dropped
+         :param strict: Set to ``True`` to make the table strict or ``False`` to make it
+           non-strict. Defaults to ``None``, which preserves the existing strict mode.
++        :param recreate_views: Set to ``True`` to drop any views that reference this
++          table before the transform and recreate them again afterwards - without
++          this, transforming a table that is part of a view will raise an error.
+         """
+         if not self.exists():
+             raise ValueError("Cannot transform a table that doesn't exist yet")
+@@ -2560,6 +2564,7 @@ class Table(Queryable):
+             column_order=column_order,
+             keep_table=keep_table,
+             strict=strict,
++            recreate_views=recreate_views,
+         )
+         pragma_foreign_keys_was_on = bool(
+             self.db.execute("PRAGMA foreign_keys").fetchone()[0]
+@@ -2646,6 +2651,7 @@ class Table(Queryable):
+         tmp_suffix: Optional[str] = None,
+         keep_table: Optional[str] = None,
+         strict: Optional[bool] = None,
++        recreate_views: bool = False,
+     ) -> List[str]:
+         """
+         Return a list of SQL statements that should be executed in order to apply this transformation.
+@@ -2668,6 +2674,9 @@ class Table(Queryable):
+           dropped
+         :param strict: Set to ``True`` to make the table strict or ``False`` to make it
+           non-strict. Defaults to ``None``, which preserves the existing strict mode.
++        :param recreate_views: Set to ``True`` to drop any views that reference this
++          table before the transform and recreate them again afterwards - without
++          this, transforming a table that is part of a view will raise an error.
+         """
+         if strict is True and not self.db.supports_strict:
+             raise TransformError("SQLite does not support STRICT tables")
+@@ -2842,7 +2851,17 @@ class Table(Queryable):
+         if column_order is not None:
+             column_order = [rename.get(col) or col for col in column_order]
+ 
++        views_to_recreate = []
++        if recreate_views:
++            views_to_recreate = [
++                (view.name, view.schema)
++                for view in self.db.views
++                if self.name.lower() in (view.schema or "").lower()
++            ]
++
+         sqls = []
++        for view_name, _ in views_to_recreate:
++            sqls.append("DROP VIEW {};".format(quote_identifier(view_name)))
+         sqls.append(
+             self.db.create_table_sql(
+                 new_table_name,
+@@ -2912,6 +2931,8 @@ class Table(Queryable):
+                             f"The original index sql statement is: `{index_sql}`. No changes have been applied to this table."
+                         )
+                 sqls.append(index_sql)
++        for _, view_schema in views_to_recreate:
++            sqls.append("{};".format(view_schema))
+         return sqls
+ 
+     def extract(
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index a2135b0..9440923 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -1940,6 +1940,27 @@ def test_transform_sql(db_path):
+     assert db["dogs"].schema == original_schema
+ 
+ 
++def test_transform_recreate_views(db_path):
++    db = Database(db_path)
++    with db.conn:
++        db["dogs"].insert(
++            {"id": 1, "age": 4, "name": "Cleo"},
++            not_null={"age"},
++            defaults={"age": 1},
++            pk="id",
++        )
++        db.create_view("dogs_view", "select id, name from dogs")
++
++    result = CliRunner().invoke(
++        cli.cli,
++        ["transform", db_path, "dogs", "--drop", "age", "--recreate-views"],
++    )
++
++    assert result.exit_code == 0, result.output
++    assert db.view_names() == ["dogs_view"]
++    assert list(db["dogs_view"].rows) == [{"id": 1, "name": "Cleo"}]
++
++
+ @pytest.mark.parametrize(
+     "initial_strict,args,expected_strict",
+     (
+diff --git a/tests/test_transform.py b/tests/test_transform.py
+index 362f1ca..f34ce8f 100644
+--- a/tests/test_transform.py
++++ b/tests/test_transform.py
+@@ -904,3 +904,33 @@ def test_transform_with_unique_constraint_implicit_index(fresh_db):
+         "You must manually drop this index prior to running this transformation and manually recreate the new index after running this transformation."
+         in str(excinfo.value)
+     )
++
++
++def test_transform_recreate_views(fresh_db):
++    # https://github.com/simonw/sqlite-utils/issues/586
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": "5", "status": "good"}, pk="id")
++    fresh_db.create_view(
++        "good_dogs", "select id, name from dogs where age = '5'"
++    )
++    dogs.transform(drop={"status"}, recreate_views=True)
++    assert fresh_db.view_names() == ["good_dogs"]
++    assert list(fresh_db["good_dogs"].rows) == [{"id": 1, "name": "Cleo"}]
++    assert dogs.columns_dict == {"id": int, "name": str, "age": str}
++
++
++def test_transform_sql_recreate_views(fresh_db):
++    dogs = fresh_db["dogs"]
++    dogs.insert({"id": 1, "name": "Cleo", "age": "5"}, pk="id")
++    fresh_db.create_view("good_dogs", "select id, name from dogs")
++    sql = dogs.transform_sql(
++        drop={"age"}, tmp_suffix="suffix", recreate_views=True
++    )
++    assert sql == [
++        'DROP VIEW "good_dogs";',
++        'CREATE TABLE "dogs_new_suffix" (\n   "id" INTEGER PRIMARY KEY,\n   "name" TEXT\n);',
++        'INSERT INTO "dogs_new_suffix" ("rowid", "id", "name")\n   SELECT "rowid", "id", "name" FROM "dogs";',
++        'DROP TABLE "dogs";',
++        'ALTER TABLE "dogs_new_suffix" RENAME TO "dogs";',
++        'CREATE VIEW "good_dogs" AS select id, name from dogs;',
++    ]

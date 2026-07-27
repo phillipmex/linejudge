@@ -1,0 +1,82 @@
+diff --git a/docs/python-api.rst b/docs/python-api.rst
+index 43b734d..e3f19b2 100644
+--- a/docs/python-api.rst
++++ b/docs/python-api.rst
+@@ -663,6 +663,13 @@ If the record does not exist a ``NotFoundError`` will be raised:
+     except NotFoundError:
+         print("Dog not found")
+ 
++You can also retrieve a record using the value of some other column by passing it as a keyword argument, provided that column has at most one matching row::
++
++    >>> db.table("dogs").get(name="Cleo")
++    {'id': 1, 'age': 4, 'name': 'Cleo'}
++
++This will raise a ``NotFoundError`` if no row matches, and a ``ValueError`` if you attempt to combine keyword arguments with a primary key value.
++
+ .. _python_api_schema:
+ 
+ Showing the schema
+diff --git a/sqlite_utils/db.py b/sqlite_utils/db.py
+index e97b7d9..d2b7463 100644
+--- a/sqlite_utils/db.py
++++ b/sqlite_utils/db.py
+@@ -2234,14 +2234,27 @@ class Table(Queryable):
+         "Does this table use ``rowid`` for its primary key (no other primary keys are specified)?"
+         return not any(column for column in self.columns if column.is_pk)
+ 
+-    def get(self, pk_values: Union[list, tuple, str, int]) -> dict:
++    def get(
++        self, pk_values: Optional[Union[list, tuple, str, int]] = None, **kwargs
++    ) -> dict:
+         """
+-        Return row (as dictionary) for the specified primary key.
++        Return row (as dictionary) for the specified primary key, or use
++        keyword arguments to look up a row by the values of other columns.
+ 
+         Raises ``sqlite_utils.db.NotFoundError`` if a matching row cannot be found.
+ 
+         :param pk_values: A single value, or a tuple of values for tables that have a compound primary key
++        :param kwargs: Column name/value pairs to look up a row by, as an alternative to ``pk_values``
+         """
++        if kwargs:
++            if pk_values is not None:
++                raise ValueError("Use pk_values or keyword arguments, not both")
++            wheres = ["{} = ?".format(quote_identifier(key)) for key in kwargs]
++            rows = self.rows_where(" and ".join(wheres), list(kwargs.values()))
++            try:
++                return list(rows)[0]
++            except IndexError:
++                raise NotFoundError
+         if not isinstance(pk_values, (list, tuple)):
+             pk_values = [pk_values]
+         pks = self.pks
+diff --git a/tests/test_get.py b/tests/test_get.py
+index 63c4a2e..f69c648 100644
+--- a/tests/test_get.py
++++ b/tests/test_get.py
+@@ -29,3 +29,25 @@ def test_get_not_found(argument, expected_msg, fresh_db):
+         fresh_db["dogs"].get(argument)
+     if expected_msg is not None:
+         assert expected_msg == excinfo.value.args[0]
++
++
++def test_get_by_kwargs(fresh_db):
++    collections = fresh_db["collections"]
++    collections.insert_all(
++        [{"id": 1, "name": "entries"}, {"id": 2, "name": "other"}], pk="id"
++    )
++    assert {"id": 1, "name": "entries"} == collections.get(name="entries")
++
++
++def test_get_by_kwargs_not_found(fresh_db):
++    collections = fresh_db["collections"]
++    collections.insert({"id": 1, "name": "entries"}, pk="id")
++    with pytest.raises(NotFoundError):
++        collections.get(name="missing")
++
++
++def test_get_by_pk_values_and_kwargs_raises_error(fresh_db):
++    collections = fresh_db["collections"]
++    collections.insert({"id": 1, "name": "entries"}, pk="id")
++    with pytest.raises(ValueError):
++        collections.get(1, name="entries")

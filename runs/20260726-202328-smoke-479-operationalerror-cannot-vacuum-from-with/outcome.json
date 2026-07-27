@@ -1,0 +1,7 @@
+{
+  "run_id": "20260726-202328-smoke-479-operationalerror-cannot-vacuum-from-with",
+  "status": "FAILED",
+  "failures": [
+    "agent wrote no REPORT.md (output contract violated)"
+  ]
+}
