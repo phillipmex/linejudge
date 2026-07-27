@@ -1,5 +1,6 @@
 {
   "decision": "approve",
+  "reviewer": "assistant",
   "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Directly implements the issue: nullif(col, '') wrapped around columns whose target type maps to INTEGER/FLOAT/REAL. Three existing expected-SQL tests updated consistently. Edge case not covered: a column that is both converted to numeric and NOT NULL now raises instead of storing '' - no test either way.",
   "decided_at": "2026-07-26T21:56:44"
 }

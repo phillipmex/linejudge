@@ -93,6 +93,10 @@ def write_decision(root, run_id, payload):
     from datetime import datetime
     record = {
         "decision": decision,
+        # anything written through this endpoint came from a person clicking, so
+        # the reviewer is human by construction — tooling that writes the file
+        # directly has to say otherwise
+        "reviewer": "human",
         "note": str(payload.get("note", ""))[:2000],
         "decided_at": datetime.now().isoformat(timespec="seconds"),
     }

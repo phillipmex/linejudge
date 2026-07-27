@@ -117,6 +117,19 @@ class StatsTests(TmpDirTestCase):
         # a reject sits alongside a passing harness verdict — that gap is the point
         self.assertIn("**Diff reviewed against the issue:** 1/2 approved", text)
         self.assertIn("| r2 | g2 | SUCCESS | PASS (1) | reject | $0.0300 |", text)
+        # no reviewer field means the dashboard wrote it, which means a person did
+        self.assertNotIn("countersigned", text)
+
+    def test_render_flags_reviews_awaiting_human_signoff(self):
+        self._seed_run("r1", "g1", "SUCCESS", 0.04, passed=True, verifiers=1)
+        self._seed_run("r2", "g2", "SUCCESS", 0.03, passed=True, verifiers=1)
+        for run_id, reviewer in (("r1", "assistant"), ("r2", "human")):
+            Path(self.tmp, "runs", run_id, "decision.json").write_text(
+                json.dumps({"decision": "approve", "reviewer": reviewer, "note": ""}),
+                encoding="utf-8",
+            )
+        text = stats.render(stats.collect(self.tmp))
+        self.assertIn("1/2 countersigned by a human", text)
 
     def test_empty_root_renders_gracefully(self):
         self.assertIn("No runs recorded", stats.render(stats.collect(self.tmp)))

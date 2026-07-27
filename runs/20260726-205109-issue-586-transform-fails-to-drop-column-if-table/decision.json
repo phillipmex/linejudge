@@ -1,5 +1,6 @@
 {
   "decision": "approve",
+  "reviewer": "assistant",
   "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Implements the issue's own proposal, including its heuristic verbatim - `self.name.lower() in view.schema.lower()` is a substring match, so transforming a table named `dog` also drops and recreates any view whose SQL mentions `dogs` or `dogfood`. Defensible as a throwaway script (which is where the issue got it), weaker as library behaviour. Also: a view referencing a dropped column is recreated silently broken, since SQLite does not validate view bodies at CREATE time. Resolves the issue's open opt-in/opt-out question unilaterally toward opt-in, which is at least backwards compatible.",
   "decided_at": "2026-07-26T21:56:44"
 }

@@ -45,6 +45,9 @@ def collect(root):
             "model": rec.get("model"),
             "recheck": recheck.get("result"),
             "decision": decision.get("decision"),
+            # the dashboard is the only writer that predates this field, and
+            # everything it wrote was a person clicking
+            "reviewer": decision.get("reviewer", "human"),
         })
     return rows
 
@@ -86,11 +89,18 @@ def render(rows, notional_cost=False):
     reviewed = [r for r in rows if r["decision"]]
     if reviewed:
         approved = sum(1 for r in reviewed if r["decision"] == "approve")
-        lines.append(
-            f"- **Diff reviewed against the issue:** {approved}/{len(reviewed)} approved "
-            "— a human read each diff next to the issue it claims to fix "
-            "(`runs/<id>/decision.json`)"
-        )
+        # A review is only worth what its reviewer is worth, so say who did it.
+        # An assistant-authored review of an assistant-authored diff is a weaker
+        # claim than a human one, and collapsing the two would be the exact
+        # overclaim this file exists to avoid.
+        unsigned = [r for r in reviewed if r["reviewer"] != "human"]
+        line = (f"- **Diff reviewed against the issue:** {approved}/{len(reviewed)} "
+                "approved — each diff read next to the issue it claims to fix "
+                "(`runs/<id>/decision.json`)")
+        if unsigned:
+            line += (f"; {len(reviewed) - len(unsigned)}/{len(reviewed)} countersigned "
+                     "by a human, the rest assistant-authored and awaiting sign-off")
+        lines.append(line)
 
     # Only claim a model when every run agrees on one; a mixed or unrecorded set
     # would make the line a guess.

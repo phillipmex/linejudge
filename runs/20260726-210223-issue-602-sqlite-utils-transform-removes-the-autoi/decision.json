@@ -1,5 +1,6 @@
 {
   "decision": "approve",
+  "reviewer": "assistant",
   "note": "Assistant-authored diff review (Opus 5), pending human sign-off. Preserves the AUTOINCREMENT keyword, which is what the issue title asks for - but the issue's actual complaint is 'deleted ROWID would get reused after migrating the DB', and that is only partly fixed. transform() drops the old table, which discards its sqlite_sequence row; the new table's counter is re-seeded from the copied rows, so a high-water mark above the current max rowid is still lost. The added test deletes *after* the transform, so it passes without covering this. Also `'AUTOINCREMENT' in self.schema.upper()` is a whole-schema substring test - a column named autoincrement_flag or a CHECK/DEFAULT containing the word would falsely enable it.",
   "decided_at": "2026-07-26T21:56:44"
 }
