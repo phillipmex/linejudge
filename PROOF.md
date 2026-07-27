@@ -4,7 +4,7 @@
 - **Runs succeeded:** 7/8
 - **Independently verified pass:** 8/8 (100%) — every task judged by verifiers, not by the agent's claim
 - **Regression test proven:** 8/8 — the added test fails with the fix removed and passes with it (`proofs/recheck.py`)
-- **Diff reviewed against the issue:** 6/8 approved — each diff read next to the issue it claims to fix (`runs/<id>/decision.json`); 1 countersigned by a human, 7 assistant-authored and adopted by the project owner, not independently re-derived
+- **Diff reviewed against the issue:** 6/8 approved — each diff read next to the issue it claims to fix (`runs/<id>/decision.json`); 2 countersigned by a human, 6 assistant-authored and adopted by the project owner, not independently re-derived
 - **Cost:** withheld — this run was billed to a Claude subscription, not per-token API credit, so the ledger's dollar figures are notional and are not published as costs.
 
 | run | goal | status | harness verdict | review |

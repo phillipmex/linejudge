@@ -1,6 +1,6 @@
 {
   "decision": "reject",
-  "reviewer": "human-adopted",
-  "note": "Adopted by the project owner without independent re-derivation; review below is assistant-authored (Opus 5). Genuine but partial, and carries one real bug. UNIQUE-auto-index and CHECK constraints are handled properly (quote masking, rename rewriting, function-call disambiguation), but _mask_quoted_regions masks string literals and quoted identifiers and *not* SQL comments - so a commented-out `-- CHECK (id > 0)` is parsed and re-emitted as an active constraint after transform. Second problem: with drop={'a'}, a compound `CHECK (a > 0 AND b > 0)` is discarded whole, silently losing the b check. Comments are openly deferred in the agent's own REPORT.md, so 'fixes #762' would overclaim. Fix the comment masking before this goes anywhere.",
-  "decided_at": "2026-07-26T22:25:07"
+  "reviewer": "human",
+  "note": "Independently re-derived by the project owner: confirmed _mask_quoted_regions masks only string literals and quoted identifiers (its own docstring says so, and the scan loop tests membership in quote_chars only), and that no part of the diff mentions comments. Finding: a commented-out constraint such as '-- CHECK (id > 0)' is scanned as live text and re-emitted as an ACTIVE constraint after transform(), so a table that accepted id = -1 starts rejecting it. Second issue: with drop={'a'}, a compound CHECK (a > 0 AND b > 0) is discarded whole, silently losing the b half. The fix is otherwise genuine but partial - the agent's own REPORT.md defers comments openly, so 'fixes #762' would overclaim. Fix the comment masking before this goes upstream.",
+  "decided_at": "2026-07-27T08:21:32"
 }
