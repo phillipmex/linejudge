@@ -23,3 +23,6 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Ad-hoc diagnostic reports from `linejudge stale-check`.
+runs/stale-check-*.md
